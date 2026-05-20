@@ -236,13 +236,19 @@ function isHomeRepresentativePaper(paper) {
     );
 }
 
+function heroTitle() {
+  return lang === "zh"
+    ? "在真实地球系统<br>训练未来研究者"
+    : "AI for Climate<br>Earth System<br>Global Change";
+}
+
 function renderShell(content) {
   const d = data();
   const f = d.footer || d.contact || {};
   app.innerHTML = `
     <header class="site-header">
       <a class="brand" href="${hrefToRoute("/")}">
-        <span class="brand-mark"><img src="assets/branding/lab-logo.png" alt="${esc(d.meta.labName)}" /></span>
+        <span class="brand-mark"><img src="assets/branding/lab-logo-transparent.png" alt="${esc(d.meta.labName)}" /></span>
         <span><strong>${esc(d.meta.labName)}</strong><small>${esc(d.meta.labNameEn)}</small></span>
       </a>
       <nav class="desktop-nav">
@@ -299,9 +305,11 @@ function renderHome() {
       ${cardImage(h.heroImage, "AI for Climate", "hero", "hero-bg")}
       <div class="hero-overlay"></div>
       <div class="hero-inner main-container">
+        <div class="hero-grid">
+          <div class="hero-content">
         <div class="hero-lab-name">
           <div class="hero-school-lockup">
-            <img class="school-lockup-logo" src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en.png" : "assets/branding/sustech-lockup-en.png"}" alt="Southern University of Science and Technology" />
+            <img class="school-lockup-logo" src="${lang === "zh" ? "assets/branding/sustech-lockup-cn.png" : "assets/branding/sustech-lockup-en.png"}" alt="Southern University of Science and Technology" />
             <span>
               <strong>${lang === "zh" ? "南方科技大学" : "Southern University of Science and Technology"}</strong>
               <small>${lang === "zh" ? "Southern University of Science and Technology" : "SUSTech"}</small>
@@ -313,13 +321,34 @@ function renderHome() {
           </div>
         </div>
         <p class="eyebrow">${esc(h.eyebrow)}</p>
-        <h1>${esc(h.title)}</h1>
+        <h1 class="hero-title">${heroTitle()}</h1>
         <p class="hero-copy">${esc(h.copy)}</p>
         <div class="hero-actions">
           <a class="button primary" href="${hrefToRoute(h.primary.href)}">${esc(h.primary.text)}</a>
           <a class="button secondary" href="${hrefToRoute(h.secondary.href)}">${esc(h.secondary.text)}</a>
         </div>
-        <div class="hero-stats">${h.stats.map((s) => `<div><strong>${esc(s.value)}</strong><span>${esc(s.label)}</span></div>`).join("")}</div>
+            <div class="hero-stats">${h.stats.slice(0, 2).map((s) => `<div><strong>${esc(s.value)}</strong><span>${esc(s.label)}</span></div>`).join("")}</div>
+          </div>
+          <div class="hero-visual" aria-label="Earth system research overview">
+            <div class="visual-orbit">
+              <span>Earth</span>
+              <span>AI</span>
+              <span>HPC</span>
+            </div>
+            <div class="visual-card visual-card--main">
+              <span>Research System</span>
+              <strong>AI for Climate</strong>
+              <p>${lang === "zh" ? "遥感、模型与机器学习共同解析全球变化。" : "Remote sensing, models, and machine learning for global change."}</p>
+            </div>
+            <div class="visual-metrics">
+              <div><strong>216+</strong><span>${lang === "zh" ? "论文成果" : "Publications"}</span></div>
+              <div><strong>AI + HPC</strong><span>${lang === "zh" ? "数据与算力" : "Data and compute"}</span></div>
+            </div>
+            <div class="visual-tags">
+              ${["Earth System", "Remote Sensing", "AI", "HPC", "Climate Risk", "Energy"].map((tag) => `<span>${tag}</span>`).join("")}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
     <section class="split band">
