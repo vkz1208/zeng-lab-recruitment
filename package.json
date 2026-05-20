@@ -1,0 +1,9 @@
+{
+  "name": "zeng-lab-recruitment",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Recruitment website for Zhenzhong Zeng Lab, AI for Climate.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
