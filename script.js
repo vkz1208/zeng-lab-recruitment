@@ -432,9 +432,8 @@ function paginationControls(name, page, totalPages, totalItems) {
 
 function hrefToRoute(href = "") {
   if (/^(https?:|mailto:|#)/.test(href)) return href;
-  const base = document.querySelector("base") ? "../" : "";
   const clean = href.replace(/^\//, "");
-  return base + (clean ? `${clean}/` : "");
+  return clean ? `${clean}/` : "";
 }
 
 function routeFromPath() {
