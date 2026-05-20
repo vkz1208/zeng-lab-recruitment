@@ -1,5 +1,5 @@
 const PASSWORD = "zenglab2026";
-const STORAGE_KEY = "zeng-lab-full-site-data-v4";
+const STORAGE_KEY = "zeng-lab-full-site-data-v5";
 const PAGE_SIZE = 10;
 const app = document.querySelector("#app");
 
