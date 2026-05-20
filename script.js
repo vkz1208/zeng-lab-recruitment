@@ -2,16 +2,9 @@ const PASSWORD = "zenglab2026";
 const STORAGE_KEY = "zeng-lab-full-site-data-v4";
 const PAGE_SIZE = 10;
 const app = document.querySelector("#app");
-const THEME_KEY = "zeng-lab-theme";
-const THEMES = [
-  { value: "original", label: "Original" },
-  { value: "apple", label: "Apple" },
-  { value: "dark", label: "Dark" }
-];
 
 let siteData = structuredClone(window.DEFAULT_SITE_DATA);
 let lang = localStorage.getItem("zeng-lab-lang") || "zh";
-let activeTheme = localStorage.getItem(THEME_KEY) || "original";
 let paperTab = "featured";
 let paperYear = "all";
 let paperTag = "all";
@@ -232,15 +225,6 @@ function data() {
   return siteData[lang] || siteData.zh;
 }
 
-function applyTheme() {
-  document.body.classList.remove(...THEMES.map((theme) => `theme-${theme.value}`));
-  document.body.classList.add(`theme-${activeTheme}`);
-}
-
-function themeOptions() {
-  return THEMES.map((theme) => `<option value="${theme.value}" ${theme.value === activeTheme ? "selected" : ""}>${theme.label}</option>`).join("");
-}
-
 function isHomeRepresentativePaper(paper) {
   const title = (paper.title || "").toLowerCase();
   const journal = (paper.journal || "").trim().toLowerCase();
@@ -253,7 +237,6 @@ function isHomeRepresentativePaper(paper) {
 }
 
 function renderShell(content) {
-  applyTheme();
   const d = data();
   const f = d.footer || d.contact || {};
   app.innerHTML = `
@@ -266,10 +249,6 @@ function renderShell(content) {
         ${d.nav.map((item) => `<a href="${hrefToRoute(item.href)}">${esc(item.label)}</a>`).join("")}
       </nav>
       <div class="header-actions">
-        <label class="theme-picker" for="theme-select">
-          <span>Style</span>
-          <select id="theme-select">${themeOptions()}</select>
-        </label>
         <button class="ghost-button" id="language-toggle" type="button">${lang === "zh" ? "EN" : "中文"}</button>
         <button class="menu-button" id="menu-toggle" type="button" aria-label="Menu">☰</button>
       </div>
@@ -306,11 +285,6 @@ function renderShell(content) {
     lang = lang === "zh" ? "en" : "zh";
     localStorage.setItem("zeng-lab-lang", lang);
     render();
-  });
-  $("#theme-select").addEventListener("change", (event) => {
-    activeTheme = event.target.value;
-    localStorage.setItem(THEME_KEY, activeTheme);
-    applyTheme();
   });
   $("#menu-toggle").addEventListener("click", () => $("#mobile-drawer").classList.toggle("open"));
 }
@@ -828,7 +802,6 @@ function renderAdmin() {
 }
 
 function render() {
-  applyTheme();
   const route = routeFromPath();
   if (route === "admin") return renderAdmin();
   const map = { home: renderHome, team: renderTeam, papers: renderPapers, research: renderResearch, resources: renderResources, news: renderNews, join: renderJoin };

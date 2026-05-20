@@ -19,37 +19,6 @@
   --list-media-height: 190px;
 }
 
-body.theme-apple {
-  --ink: #15171a;
-  --muted: #687076;
-  --line: rgba(21, 23, 26, 0.12);
-  --paper: #f5f5f7;
-  --white: #ffffff;
-  --mist: #eef1f4;
-  --leaf: #007aff;
-  --leaf-dark: #0a66c2;
-  --sky: #dceeff;
-  --gold: #9a7a30;
-  --shadow: 0 18px 42px rgba(29, 35, 42, 0.08);
-  --shadow-hover: 0 22px 52px rgba(29, 35, 42, 0.13);
-  --radius: 12px;
-}
-
-body.theme-dark {
-  --ink: #f3f7f4;
-  --muted: #a9b7b1;
-  --line: rgba(235, 245, 240, 0.14);
-  --paper: #101412;
-  --white: #171d1a;
-  --mist: #1f2925;
-  --leaf: #51d6a8;
-  --leaf-dark: #7ce4bd;
-  --sky: #19343c;
-  --gold: #e0b760;
-  --shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
-  --shadow-hover: 0 24px 58px rgba(0, 0, 0, 0.36);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -120,27 +89,6 @@ img {
   backdrop-filter: blur(18px);
 }
 
-body.theme-apple .site-header {
-  background: rgba(245, 245, 247, 0.9);
-}
-
-body.theme-dark .site-header {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-  background: rgba(16, 20, 18, 0.9);
-}
-
-body.theme-dark .theme-picker,
-body.theme-dark .ghost-button,
-body.theme-dark .menu-button,
-body.theme-dark .admin-actions button {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-body.theme-dark .theme-picker select option {
-  background: #171d1a;
-  color: #f3f7f4;
-}
-
 .brand {
   display: flex;
   align-items: center;
@@ -209,35 +157,6 @@ footer span {
   gap: 8px;
 }
 
-.theme-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--ink);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.theme-picker span {
-  color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.theme-picker select {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  outline: 0;
-  cursor: pointer;
-}
-
 .ghost-button,
 .menu-button,
 .admin-actions button {
@@ -287,12 +206,6 @@ footer span {
   background:
     linear-gradient(90deg, rgba(251, 252, 248, 0.96) 0%, rgba(251, 252, 248, 0.84) 40%, rgba(251, 252, 248, 0.16) 82%),
     linear-gradient(180deg, rgba(251, 252, 248, 0.16) 0%, rgba(251, 252, 248, 0.92) 100%);
-}
-
-body.theme-dark .hero-overlay {
-  background:
-    linear-gradient(90deg, rgba(16, 20, 18, 0.96) 0%, rgba(16, 20, 18, 0.82) 42%, rgba(16, 20, 18, 0.24) 84%),
-    linear-gradient(180deg, rgba(16, 20, 18, 0.18) 0%, rgba(16, 20, 18, 0.92) 100%);
 }
 
 .hero-inner {
@@ -650,14 +563,6 @@ section {
 
 .page-hero {
   background: linear-gradient(135deg, #ffffff 0%, #f4faf6 62%, #e8f4f7 100%);
-}
-
-body.theme-apple .page-hero {
-  background: linear-gradient(135deg, #ffffff 0%, #f5f7fb 58%, #e8f2ff 100%);
-}
-
-body.theme-dark .page-hero {
-  background: linear-gradient(135deg, #171d1a 0%, #16231e 58%, #13282f 100%);
 }
 
 .page-hero div {
@@ -1490,15 +1395,6 @@ footer a {
 
   .site-header {
     padding-inline: 14px;
-  }
-
-  .theme-picker {
-    gap: 0;
-    padding-inline: 10px;
-  }
-
-  .theme-picker span {
-    display: none;
   }
 
   .brand small {
