@@ -14,7 +14,7 @@ function getSavedData() {
 
 async function getServerData() {
   try {
-    const response = await fetch("/content.json", { cache: "no-store" });
+    const response = await fetch("content.json", { cache: "no-store" });
     if (!response.ok) return {};
     return await response.json();
   } catch {
@@ -24,7 +24,7 @@ async function getServerData() {
 
 async function saveServerData(data) {
   try {
-    const response = await fetch("/api/content", {
+    const response = await fetch("api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -172,18 +172,18 @@ function buildAdmin() {
     if (!confirm("确定恢复默认内容？")) return;
     await saveServerData({});
     localStorage.removeItem(STORAGE_KEY);
-    location.href = "/";
+    location.href = "../";
   });
 }
 
 function startAdminIfNeeded() {
-  if (!location.pathname.endsWith("/admin")) return;
+  if (!location.pathname.endsWith("/admin") && !location.pathname.endsWith("/admin/")) return;
   const password = window.prompt("请输入管理密码");
   if (password === PASSWORD) {
     buildAdmin();
   } else {
     alert("密码错误");
-    location.href = "/";
+    location.href = "../";
   }
 }
 

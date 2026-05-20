@@ -41,7 +41,7 @@ const server = http.createServer((req, res) => {
   }
 
   const pathname = decodeURIComponent(url.pathname);
-  const target = pathname === "/" || pathname === "/admin" ? "/index.html" : pathname;
+  const target = pathname === "/" || pathname === "/admin" || pathname === "/admin/" ? "/index.html" : pathname;
   const file = path.join(root, target);
 
   if (!file.startsWith(root)) {
