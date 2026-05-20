@@ -301,15 +301,7 @@ function renderHome() {
       <div class="hero-inner main-container">
         <div class="hero-lab-name">
           <div class="hero-school-lockup">
-            <img class="school-lockup-logo" src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en.png" : "assets/branding/sustech-lockup-en.png"}" alt="Southern University of Science and Technology" />
-            <span>
-              <strong>${lang === "zh" ? "南方科技大学" : "Southern University of Science and Technology"}</strong>
-              <small>${lang === "zh" ? "Southern University of Science and Technology" : "SUSTech"}</small>
-            </span>
-          </div>
-          <div>
-            <strong>${esc(d.meta.labName)}</strong>
-            <span>${esc(d.meta.labNameEn)}</span>
+            <img class="school-lockup-logo" src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en-crop.png" : "assets/branding/sustech-lockup-en-crop.png"}" alt="Southern University of Science and Technology" />
           </div>
         </div>
         <p class="eyebrow">${esc(h.eyebrow)}</p>
