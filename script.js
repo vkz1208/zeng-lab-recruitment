@@ -89,6 +89,9 @@ const TEAM_MEMBER_TEXT = {
   "Binbin Zeng": { zh: { started: "2019.09 入组", email: "zengbb@mail.sustech.edu.cn" }, en: { started: "Joined 2019.09", email: "zengbb@mail.sustech.edu.cn" } }
 };
 
+TEAM_MEMBER_TEXT["Yaotong Cai"] = { zh: { image: "assets/team/yaotong_cai.jpg" }, en: { image: "assets/team/yaotong_cai.jpg" } };
+TEAM_MEMBER_TEXT["Qun Luo"] = { zh: { image: "assets/team/qun_luo.jpg" }, en: { image: "assets/team/qun_luo.jpg" } };
+
 function memberExtra(member, langKey) {
   return TEAM_MEMBER_TEXT[member.name]?.[langKey] || TEAM_MEMBER_TEXT[member.cn]?.[langKey] || {};
 }
@@ -98,6 +101,7 @@ function mergeMemberText(member, extra = {}) {
     .filter((item, index, list) => item && list.indexOf(item) === index);
   return {
     ...member,
+    image: member.image || extra.image || "",
     started: member.started || extra.started || "",
     email: member.email || extra.email || "",
     bio: member.bio || extra.bio || "",
@@ -238,7 +242,7 @@ function renderShell(content) {
   app.innerHTML = `
     <header class="site-header">
       <a class="brand" href="${hrefToRoute("/")}">
-        <span class="brand-mark">ES</span>
+        <span class="brand-mark"><img src="assets/branding/lab-logo.png" alt="${esc(d.meta.labName)}" /></span>
         <span><strong>${esc(d.meta.labName)}</strong><small>${esc(d.meta.labNameEn)}</small></span>
       </a>
       <nav class="desktop-nav">
@@ -297,7 +301,7 @@ function renderHome() {
       <div class="hero-inner main-container">
         <div class="hero-lab-name">
           <div class="hero-school-lockup">
-            <span class="school-mark">S</span>
+            <img class="school-lockup-logo" src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en.png" : "assets/branding/sustech-lockup-en.png"}" alt="Southern University of Science and Technology" />
             <span>
               <strong>${lang === "zh" ? "南方科技大学" : "Southern University of Science and Technology"}</strong>
               <small>${lang === "zh" ? "Southern University of Science and Technology" : "SUSTech"}</small>
