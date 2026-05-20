@@ -92,6 +92,82 @@ const TEAM_MEMBER_TEXT = {
 TEAM_MEMBER_TEXT["Yaotong Cai"] = { zh: { image: "assets/team/yaotong_cai.jpg" }, en: { image: "assets/team/yaotong_cai.jpg" } };
 TEAM_MEMBER_TEXT["Qun Luo"] = { zh: { image: "assets/team/qun_luo.jpg" }, en: { image: "assets/team/qun_luo.jpg" } };
 
+const TEAM_ROLE_ORDER = {
+  current: [
+    ["博士后", "江鑫"],
+    ["博士后", "蔡耀通"],
+    ["访问学者", "徐荣嵘"],
+    ["访问学者", "罗舒心"],
+    ["访问学者", "谢舒笛"],
+    ["访问学者", "张萌"],
+    ["在读博士", "徐嘉玉"],
+    ["在读博士", "覃颖祚"],
+    ["在读博士", "刘小叶"],
+    ["在读博士", "冯巧梅"],
+    ["在读硕士", "梁雨欣"],
+    ["在读硕士", "严涵阳"],
+    ["在读本科生", "严悦"],
+    ["在读本科生", "林子越"],
+    ["在读本科生", "邹欣妤"],
+    ["在读本科生", "高舸帆"],
+    ["在读本科生", "秦思锦"],
+    ["访问学生", "金宇斌"],
+    ["访问学生", "魏思焕"],
+    ["访问学生", "赵雅楠"],
+    ["科研教学助理", "罗群"],
+    ["科研教学助理", "曾斌斌"]
+  ],
+  alumni: [
+    ["已离职研究助理教授、出站博士后", "王大山"],
+    ["已离职研究助理教授、出站博士后", "徐荣嵘"],
+    ["已出站博士后", "杨锋"],
+    ["已出站博士后", "KHAN MUHAMMAD ASIF"],
+    ["已毕业博士", "何心悦"],
+    ["已毕业博士", "武婕"],
+    ["已毕业博士", "冯禹"],
+    ["已毕业博士", "陈鹤"],
+    ["已毕业博士", "邹俊宇"],
+    ["已毕业博士", "江鑫"],
+    ["已毕业硕士", "周俐宏"],
+    ["已毕业硕士", "金宇斌"],
+    ["已毕业硕士", "梁时婧"],
+    ["已毕业硕士", "梁莉莉"],
+    ["已毕业硕士", "黄筱雯"],
+    ["已毕业硕士", "魏思焕"],
+    ["已毕业本科生", "胡世杰"],
+    ["已毕业本科生", "刘怡"],
+    ["已毕业本科生", "赵雅楠"],
+    ["已毕业本科生", "杨欣荣"],
+    ["已毕业本科生", "徐嘉玉"],
+    ["已离职科研助理", "范文新"],
+    ["已离职科研助理", "彭展翔"],
+    ["历史访问人员", "林子裕"],
+    ["历史访问人员", "刘洋"],
+    ["历史访问人员", "王新月"],
+    ["历史访问人员", "郭亚东"],
+    ["历史访问人员", "丁晟平"],
+    ["历史访问人员", "董天云"]
+  ]
+};
+
+const ROLE_TRANSLATIONS = {
+  "负责人": "Principal Investigator",
+  "博士后": "Postdoctoral Researcher",
+  "访问学者": "Visiting Scholar",
+  "在读博士": "PhD Student",
+  "在读硕士": "Master Student",
+  "在读本科生": "Undergraduate Student",
+  "访问学生": "Visiting Student",
+  "科研教学助理": "Research and Teaching Assistant",
+  "已离职研究助理教授、出站博士后": "Former Research Assistant Professor / Postdoctoral Fellow",
+  "已出站博士后": "Former Postdoctoral Fellow",
+  "已毕业博士": "PhD Alumni",
+  "已毕业硕士": "Master Alumni",
+  "已毕业本科生": "Undergraduate Alumni",
+  "已离职科研助理": "Former Research Assistant",
+  "历史访问人员": "Former Visitor"
+};
+
 function memberExtra(member, langKey) {
   return TEAM_MEMBER_TEXT[member.name]?.[langKey] || TEAM_MEMBER_TEXT[member.cn]?.[langKey] || {};
 }
@@ -128,6 +204,65 @@ function normalizeTeamData() {
     (team.alumniSections || []).forEach((section) => {
       section.members = (section.members || []).map((member) => normalizeTeamMember(member, langKey));
     });
+  });
+}
+
+function memberMatches(member, cnName, langKey) {
+  const target = cnName.toLowerCase();
+  const values = [member.name, member.cn].filter(Boolean).map((value) => String(value).toLowerCase());
+  if (target === "khan muhammad asif") return values.some((value) => value.includes("khan muhammad asif"));
+  return values.includes(target);
+}
+
+function sectionTitle(role, langKey) {
+  return langKey === "zh" ? role : (ROLE_TRANSLATIONS[role] || role);
+}
+
+function roleLabel(role, langKey) {
+  return sectionTitle(role, langKey);
+}
+
+function reorderMembersByRole(sections = [], roleRows, langKey, keepFirstSection = false) {
+  const preserved = keepFirstSection ? sections.slice(0, 1) : [];
+  const sourceSections = keepFirstSection ? sections.slice(1) : sections;
+  const pool = sourceSections.flatMap((section) => section.members || []);
+  const used = new Set();
+  const grouped = [];
+
+  roleRows.forEach(([role, cnName]) => {
+    const index = pool.findIndex((member, memberIndex) => !used.has(memberIndex) && memberMatches(member, cnName, langKey));
+    if (index < 0) return;
+    used.add(index);
+    let section = grouped.find((item) => item.title === sectionTitle(role, langKey));
+    if (!section) {
+      section = { title: sectionTitle(role, langKey), members: [] };
+      grouped.push(section);
+    }
+    section.members.push({ ...pool[index], role: roleLabel(role, langKey) });
+  });
+
+  sourceSections.forEach((sourceSection) => {
+    (sourceSection.members || []).forEach((member) => {
+      const index = pool.indexOf(member);
+      if (used.has(index)) return;
+      let section = grouped.find((item) => item.title === sourceSection.title);
+      if (!section) {
+        section = { title: sourceSection.title, members: [] };
+        grouped.push(section);
+      }
+      section.members.push(member);
+    });
+  });
+
+  return [...preserved, ...grouped];
+}
+
+function applyTeamRoleOrder() {
+  ["zh", "en"].forEach((langKey) => {
+    const team = siteData[langKey]?.team;
+    if (!team) return;
+    team.sections = reorderMembersByRole(team.sections || [], TEAM_ROLE_ORDER.current, langKey, true);
+    team.alumniSections = reorderMembersByRole(team.alumniSections || [], TEAM_ROLE_ORDER.alumni, langKey, false);
   });
 }
 
@@ -226,14 +361,7 @@ function data() {
 }
 
 function isHomeRepresentativePaper(paper) {
-  const title = (paper.title || "").toLowerCase();
-  const journal = (paper.journal || "").trim().toLowerCase();
-  return paper.year === "2025"
-    && (journal === "nature" || journal === "science")
-    && (
-      title.includes("record-breaking 2023 marine heatwaves")
-      || title.includes("impact of amazonian deforestation on precipitation reverses between seasons")
-    );
+  return Boolean(paper.homeFeatured);
 }
 
 function renderShell(content) {
@@ -293,7 +421,7 @@ function renderHome() {
   const d = data();
   const h = d.home;
   const homeDirections = h.highlights || [];
-  const featuredPapers = (d.papers?.items || []).filter(isHomeRepresentativePaper).slice(0, 2);
+  const featuredPapers = (d.papers?.items || []).filter(isHomeRepresentativePaper);
   renderShell(`
     <section class="hero">
       ${cardImage(h.heroImage, "AI for Climate", "hero", "hero-bg")}
@@ -818,6 +946,7 @@ async function init() {
   mergeData(siteData, serverData);
   if (localData) mergeData(siteData, JSON.parse(localData));
   normalizeTeamData();
+  applyTeamRoleOrder();
   render();
 }
 
