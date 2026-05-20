@@ -1,5 +1,5 @@
 const PASSWORD = "zenglab2026";
-const STORAGE_KEY = "zeng-lab-full-site-data-v5";
+const STORAGE_KEY = "zeng-lab-full-site-data-v6";
 const PAGE_SIZE = 10;
 const app = document.querySelector("#app");
 
@@ -93,79 +93,228 @@ TEAM_MEMBER_TEXT["Yaotong Cai"] = { zh: { image: "assets/team/yaotong_cai.jpg" }
 TEAM_MEMBER_TEXT["Qun Luo"] = { zh: { image: "assets/team/qun_luo.jpg" }, en: { image: "assets/team/qun_luo.jpg" } };
 
 const TEAM_ROLE_ORDER = {
-  current: [
-    ["博士后", "江鑫"],
-    ["博士后", "蔡耀通"],
-    ["访问学者", "徐荣嵘"],
-    ["访问学者", "罗舒心"],
-    ["访问学者", "谢舒笛"],
-    ["访问学者", "张萌"],
-    ["在读博士", "徐嘉玉"],
-    ["在读博士", "覃颖祚"],
-    ["在读博士", "刘小叶"],
-    ["在读博士", "冯巧梅"],
-    ["在读硕士", "梁雨欣"],
-    ["在读硕士", "严涵阳"],
-    ["在读本科生", "严悦"],
-    ["在读本科生", "林子越"],
-    ["在读本科生", "邹欣妤"],
-    ["在读本科生", "高舸帆"],
-    ["在读本科生", "秦思锦"],
-    ["访问学生", "金宇斌"],
-    ["访问学生", "魏思焕"],
-    ["访问学生", "赵雅楠"],
-    ["科研教学助理", "罗群"],
-    ["科研教学助理", "曾斌斌"]
+  "current": [
+    [
+      "博士后",
+      "江鑫"
+    ],
+    [
+      "博士后",
+      "蔡耀通"
+    ],
+    [
+      "教师",
+      "徐荣嵘"
+    ],
+    [
+      "教师",
+      "罗舒心"
+    ],
+    [
+      "博士后",
+      "谢舒笛"
+    ],
+    [
+      "博士后",
+      "张萌"
+    ],
+    [
+      "在读博士",
+      "徐嘉玉"
+    ],
+    [
+      "在读博士",
+      "覃颖祚"
+    ],
+    [
+      "在读博士",
+      "刘小叶"
+    ],
+    [
+      "在读博士",
+      "冯巧梅"
+    ],
+    [
+      "在读硕士",
+      "梁雨欣"
+    ],
+    [
+      "在读硕士",
+      "严涵阳"
+    ],
+    [
+      "在读本科生",
+      "严悦"
+    ],
+    [
+      "在读本科生",
+      "林子越"
+    ],
+    [
+      "在读本科生",
+      "邹欣妤"
+    ],
+    [
+      "在读本科生",
+      "高舸帆"
+    ],
+    [
+      "在读本科生",
+      "秦思锦"
+    ],
+    [
+      "在读博士",
+      "金宇斌"
+    ],
+    [
+      "在读博士",
+      "魏思焕"
+    ],
+    [
+      "在读博士",
+      "赵雅楠"
+    ],
+    [
+      "科研教学助理",
+      "罗群"
+    ],
+    [
+      "大总管",
+      "曾斌斌"
+    ]
   ],
-  alumni: [
-    ["已离职研究助理教授、出站博士后", "王大山"],
-    ["已离职研究助理教授、出站博士后", "徐荣嵘"],
-    ["已出站博士后", "杨锋"],
-    ["已出站博士后", "KHAN MUHAMMAD ASIF"],
-    ["已毕业博士", "何心悦"],
-    ["已毕业博士", "武婕"],
-    ["已毕业博士", "冯禹"],
-    ["已毕业博士", "陈鹤"],
-    ["已毕业博士", "邹俊宇"],
-    ["已毕业博士", "江鑫"],
-    ["已毕业硕士", "周俐宏"],
-    ["已毕业硕士", "金宇斌"],
-    ["已毕业硕士", "梁时婧"],
-    ["已毕业硕士", "梁莉莉"],
-    ["已毕业硕士", "黄筱雯"],
-    ["已毕业硕士", "魏思焕"],
-    ["已毕业本科生", "胡世杰"],
-    ["已毕业本科生", "刘怡"],
-    ["已毕业本科生", "赵雅楠"],
-    ["已毕业本科生", "杨欣荣"],
-    ["已毕业本科生", "徐嘉玉"],
-    ["已离职科研助理", "范文新"],
-    ["已离职科研助理", "彭展翔"],
-    ["历史访问人员", "林子裕"],
-    ["历史访问人员", "刘洋"],
-    ["历史访问人员", "王新月"],
-    ["历史访问人员", "郭亚东"],
-    ["历史访问人员", "丁晟平"],
-    ["历史访问人员", "董天云"]
+  "alumni": [
+    [
+      "出站博士后",
+      "王大山"
+    ],
+    [
+      "已出站博士后",
+      "杨锋"
+    ],
+    [
+      "已出站博士后",
+      "KHAN MUHAMMAD ASIF"
+    ],
+    [
+      "已毕业博士",
+      "何心悦"
+    ],
+    [
+      "已毕业博士",
+      "武婕"
+    ],
+    [
+      "已毕业博士",
+      "冯禹"
+    ],
+    [
+      "已毕业博士",
+      "陈鹤"
+    ],
+    [
+      "已毕业博士",
+      "邹俊宇"
+    ],
+    [
+      "已毕业博士",
+      "江鑫"
+    ],
+    [
+      "已毕业硕士",
+      "周俐宏"
+    ],
+    [
+      "已毕业硕士",
+      "金宇斌"
+    ],
+    [
+      "已毕业硕士",
+      "梁时婧"
+    ],
+    [
+      "已毕业硕士",
+      "梁莉莉"
+    ],
+    [
+      "已毕业硕士",
+      "黄筱雯"
+    ],
+    [
+      "已毕业硕士",
+      "魏思焕"
+    ],
+    [
+      "已毕业本科生",
+      "胡世杰"
+    ],
+    [
+      "已毕业本科生",
+      "刘怡"
+    ],
+    [
+      "已毕业本科生",
+      "赵雅楠"
+    ],
+    [
+      "已毕业本科生",
+      "杨欣荣"
+    ],
+    [
+      "已毕业本科生",
+      "徐嘉玉"
+    ],
+    [
+      "已离职科研助理",
+      "范文新"
+    ],
+    [
+      "已离职科研助理",
+      "彭展翔"
+    ],
+    [
+      "历史访问人员",
+      "林子裕"
+    ],
+    [
+      "历史访问人员",
+      "刘洋"
+    ],
+    [
+      "历史访问人员",
+      "王新月"
+    ],
+    [
+      "历史访问人员",
+      "郭亚东"
+    ],
+    [
+      "历史访问人员",
+      "丁晟平"
+    ],
+    [
+      "已出站博士后",
+      "董天云"
+    ],
+    [
+      "已毕业本科生",
+      "梁时婧"
+    ],
+    [
+      "已毕业本科生",
+      "黄晓雯"
+    ]
   ]
 };
 
 const ROLE_TRANSLATIONS = {
-  "负责人": "Principal Investigator",
-  "博士后": "Postdoctoral Researcher",
-  "访问学者": "Visiting Scholar",
-  "在读博士": "PhD Student",
-  "在读硕士": "Master Student",
-  "在读本科生": "Undergraduate Student",
-  "访问学生": "Visiting Student",
-  "科研教学助理": "Research and Teaching Assistant",
-  "已离职研究助理教授、出站博士后": "Former Research Assistant Professor / Postdoctoral Fellow",
-  "已出站博士后": "Former Postdoctoral Fellow",
-  "已毕业博士": "PhD Alumni",
-  "已毕业硕士": "Master Alumni",
-  "已毕业本科生": "Undergraduate Alumni",
-  "已离职科研助理": "Former Research Assistant",
-  "历史访问人员": "Former Visitor"
+  "???": "Lab Manager",
+  "??": "Faculty",
+  "????": "Visiting Student",
+  "?????": "Master Alumni",
+  "??????": "Former Visitor",
+  "???????????????": "Former Research Assistant Professor / Postdoctoral Fellow",
+  "???????": "Former Research Assistant"
 };
 
 function memberExtra(member, langKey) {
@@ -239,19 +388,6 @@ function reorderMembersByRole(sections = [], roleRows, langKey, keepFirstSection
       grouped.push(section);
     }
     section.members.push({ ...pool[index], role: roleLabel(role, langKey) });
-  });
-
-  sourceSections.forEach((sourceSection) => {
-    (sourceSection.members || []).forEach((member) => {
-      const index = pool.indexOf(member);
-      if (used.has(index)) return;
-      let section = grouped.find((item) => item.title === sourceSection.title);
-      if (!section) {
-        section = { title: sourceSection.title, members: [] };
-        grouped.push(section);
-      }
-      section.members.push(member);
-    });
   });
 
   return [...preserved, ...grouped];

@@ -1,4 +1,4 @@
-﻿window.PAPER_LIST = [
+window.PAPER_LIST = [
   {
     "year": "2026",
     "journal": "PNAS",
@@ -96,8 +96,8 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2026",
@@ -219,7 +219,7 @@
       "可持续能源"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2025",
@@ -245,7 +245,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2025",
@@ -379,8 +379,8 @@
     "tags": [
       "地球系统科学"
     ],
-    "featured": false,
-    "homeFeatured": false
+    "featured": true,
+    "homeFeatured": true
   },
   {
     "year": "2025",
@@ -392,7 +392,7 @@
       "生态水文"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2025",
@@ -417,7 +417,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2025",
@@ -543,8 +543,8 @@
       "遥感",
       "土地利用变化"
     ],
-    "featured": false,
-    "homeFeatured": false
+    "featured": true,
+    "homeFeatured": true
   },
   {
     "year": "2025",
@@ -557,7 +557,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2025",
@@ -756,8 +756,8 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2024",
@@ -806,7 +806,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -880,7 +880,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2024",
@@ -1025,7 +1025,7 @@
     "tags": [
       "气候变化影响"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1038,7 +1038,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1151,7 +1151,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1312,7 +1312,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1324,8 +1324,8 @@
     "tags": [
       "生态水文"
     ],
-    "featured": false,
-    "homeFeatured": false
+    "featured": true,
+    "homeFeatured": true
   },
   {
     "year": "2023",
@@ -1349,7 +1349,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1412,7 +1412,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1462,7 +1462,7 @@
     "tags": [
       "可持续能源"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1538,7 +1538,7 @@
       "气候变化影响"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2022",
@@ -1575,7 +1575,7 @@
       "气候变化影响"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2022",
@@ -1699,7 +1699,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1711,7 +1711,7 @@
     "tags": [
       "可持续能源"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1797,8 +1797,8 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2021",
@@ -1823,7 +1823,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1836,7 +1836,7 @@
       "遥感",
       "土地利用变化"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -1935,7 +1935,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2020",
@@ -2010,7 +2010,7 @@
       "土地利用变化"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2020",
@@ -2120,7 +2120,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -2133,7 +2133,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -2173,7 +2173,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2018",
@@ -2236,7 +2236,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -2262,7 +2262,7 @@
       "碳循环"
     ],
     "featured": true,
-    "homeFeatured": true
+    "homeFeatured": false
   },
   {
     "year": "2017",
@@ -2286,8 +2286,8 @@
     "tags": [
       "气候变化影响"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2016",
@@ -2298,8 +2298,8 @@
     "tags": [
       "气候变化影响"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2016",
@@ -2400,8 +2400,8 @@
     "tags": [
       "气候变化影响"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2016",
@@ -2463,8 +2463,8 @@
     "tags": [
       "气候变化影响"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2015",
@@ -2513,7 +2513,7 @@
     "tags": [
       "气候变化影响"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
@@ -2613,8 +2613,8 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": true,
-    "homeFeatured": true
+    "featured": false,
+    "homeFeatured": false
   },
   {
     "year": "2014",
@@ -2676,7 +2676,7 @@
       "生态系统",
       "碳循环"
     ],
-    "featured": false,
+    "featured": true,
     "homeFeatured": false
   },
   {
