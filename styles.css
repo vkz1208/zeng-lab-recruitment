@@ -1843,13 +1843,27 @@ footer a {
   display: block;
 }
 
-.inline-edit-button {
+.admin-preview-mode .hero,
+.admin-preview-mode .split,
+.admin-preview-mode .page-hero,
+.admin-preview-mode .content-section,
+.admin-preview-mode .join-page,
+.admin-preview-mode .contact-section,
+.admin-preview-mode article {
   position: relative;
+}
+
+.inline-edit-button,
+.inline-add-button,
+.inline-delete-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   z-index: 8;
   display: inline-grid;
   min-width: 34px;
   min-height: 24px;
-  margin-left: 8px;
+  margin-left: 0;
   padding: 0 8px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--leaf) 42%, var(--line));
@@ -1861,7 +1875,26 @@ footer a {
   font-size: 0.72rem;
   font-weight: 900;
   line-height: 1;
-  vertical-align: middle;
+}
+
+.inline-add-button {
+  position: relative;
+  top: auto;
+  right: auto;
+  min-width: 54px;
+  margin: 8px 0 14px;
+  background: var(--leaf-dark);
+  color: white;
+}
+
+.section-head .inline-add-button {
+  margin: 0;
+}
+
+.inline-delete-button {
+  top: 42px;
+  border-color: color-mix(in srgb, #b42318 40%, var(--line));
+  color: #b42318;
 }
 
 .editable-media > .inline-edit-button {
@@ -1899,10 +1932,11 @@ footer a {
 .inline-edit-dialog {
   position: relative;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0;
   width: min(620px, calc(100vw - 28px));
-  max-height: min(720px, calc(100vh - 36px));
-  margin: 18vh auto 0;
+  max-height: min(720px, calc(100vh - 48px));
+  margin: 6vh auto 0;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--leaf) 32%, var(--line));
   border-radius: 8px;
@@ -1956,6 +1990,11 @@ footer a {
   padding: 18px;
 }
 
+.inline-edit-grid {
+  display: grid;
+  gap: 14px;
+}
+
 .inline-edit-field {
   display: grid;
   gap: 8px;
@@ -1990,6 +2029,18 @@ footer a {
   height: 22px;
   padding: 0;
   accent-color: var(--leaf-dark);
+}
+
+.inline-edit-field--upload {
+  margin-top: -8px;
+}
+
+.inline-edit-hint,
+.inline-edit-empty {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .inline-edit-preview {

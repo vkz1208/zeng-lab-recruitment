@@ -75,19 +75,33 @@ function adminEditButton(path, label = "", type = "text") {
   return `<button class="inline-edit-button" type="button" data-inline-edit="${esc(path)}" data-edit-type="${esc(type)}" aria-label="${esc(label || path)}">编辑</button>`;
 }
 
+function adminGroupButton(path, label = "") {
+  return adminEditButton(path, label, "group");
+}
+
+function adminAddButton(path, type, label = "") {
+  if (!adminMode || !path || !type) return "";
+  return `<button class="inline-add-button" type="button" data-inline-add="${esc(path)}" data-add-type="${esc(type)}" aria-label="${esc(label || path)}">${lang === "zh" ? "新增" : "Add"}</button>`;
+}
+
+function adminDeleteButton(path, label = "") {
+  if (!adminMode || !path) return "";
+  return `<button class="inline-delete-button" type="button" data-inline-delete="${esc(path)}" aria-label="${esc(label || path)}">${lang === "zh" ? "删除" : "Delete"}</button>`;
+}
+
 function editableText(value, path, tag = "span", className = "", type = "text") {
   const classes = ["editable-fragment", className].filter(Boolean).join(" ");
-  return `<${tag} class="${classes}"><span class="editable-value">${esc(value)}</span>${adminEditButton(path, value, type)}</${tag}>`;
+  return `<${tag} class="${classes}"><span class="editable-value">${esc(value)}</span></${tag}>`;
 }
 
 function editableInline(value, path, type = "text") {
-  return `${esc(value)}${adminEditButton(path, value, type)}`;
+  return `${esc(value)}`;
 }
 
 function editableImage(src, path, alt = "", type = "card", extraClass = "") {
   const image = cardImage(src, alt, type, extraClass);
   if (!adminMode || !path || !image) return image;
-  return `<span class="editable-media">${image}${adminEditButton(path, alt || path, "image")}</span>`;
+  return `<span class="editable-media">${image}</span>`;
 }
 
 function installImageFallbacks(root = app) {
@@ -545,9 +559,10 @@ function mergeData(base, patch) {
   return base;
 }
 
-function pageHero(title, intro, titlePath = "", introPath = "") {
+function pageHero(title, intro, titlePath = "", introPath = "", groupPath = "") {
   return `
     <section class="page-hero">
+      ${adminGroupButton(groupPath, title)}
       <div class="main-container">
         <p class="eyebrow">${esc(data().meta.labName)}</p>
         ${editableText(title, titlePath, "h1")}
@@ -578,6 +593,8 @@ function homePaperCard(paper, index = -1) {
   const attrs = clickable ? ` href="${safeHref(paper.link)}" ${linkAttrs(paper.link)}` : "";
   return `
     <${tag} class="home-paper-card ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      ${adminGroupButton(basePath, paper.title)}
+      ${adminDeleteButton(basePath, paper.title)}
       <span>${editableInline(paper.year, `${basePath}.year`)} · ${editableInline(paper.journal, `${basePath}.journal`)}</span>
       <strong>${editableInline(paper.title, `${basePath}.title`, "long")}</strong>
       ${editableText(paper.authors, `${basePath}.authors`, "p", "", "long")}
@@ -592,6 +609,8 @@ function paperRow(paper, index = -1) {
   const attrs = clickable ? ` href="${safeHref(paper.link)}" ${linkAttrs(paper.link)}` : "";
   return `
     <${tag} class="paper-row ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      ${adminGroupButton(basePath, paper.title)}
+      ${adminDeleteButton(basePath, paper.title)}
       <span>${editableInline(paper.year, `${basePath}.year`)}</span>
       <div>
         <strong>${editableInline(paper.title, `${basePath}.title`, "long")}</strong>
@@ -610,6 +629,8 @@ function resourceCard(item, index = -1) {
   const wideThumb = /GGWS|Fig1|floating/i.test(item.image || "");
   return `
     <${tag} class="resource-card ${wideThumb ? "resource-card--wide-thumb" : ""} ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      ${adminGroupButton(basePath, item.title)}
+      ${adminDeleteButton(basePath, item.title)}
       ${editableImage(item.image, `${basePath}.image`, item.title, "resource")}
       <div>
         ${editableText(item.title, `${basePath}.title`, "h3")}
@@ -627,6 +648,8 @@ function newsItemCard(item, index = -1) {
   const attrs = clickable ? ` href="${hrefToRoute(item.link)}" ${linkAttrs(item.link)}` : "";
   return `
     <${tag} class="${className} ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      ${adminGroupButton(basePath, item.title)}
+      ${adminDeleteButton(basePath, item.title)}
       ${editableImage(item.image, `${basePath}.image`, item.title, "news") || `<span>${editableInline(item.date, `${basePath}.date`)}</span>`}
       <div>
         ${item.image ? `<span>${editableInline(item.date, `${basePath}.date`)}</span>` : ""}
@@ -701,6 +724,7 @@ function renderHome() {
     .filter(({ paper }) => isHomeRepresentativePaper(paper));
   renderShell(`
     <section class="hero">
+      ${adminGroupButton(`root.${lang}.home`, h.title)}
       ${editableImage(h.heroImage, `root.${lang}.home.heroImage`, "AI for Climate", "hero", "hero-bg")}
       <div class="hero-overlay"></div>
       <div class="hero-inner main-container">
@@ -724,6 +748,7 @@ function renderHome() {
       </div>
     </section>
     <section class="split band">
+      ${adminGroupButton(`root.${lang}.home`, h.featureTitle)}
       <div>
         ${editableText(h.featureTitle, `root.${lang}.home.featureTitle`, "h2")}
       </div>
@@ -733,6 +758,7 @@ function renderHome() {
       ${editableImage(h.teamImage, `root.${lang}.home.teamImage`, "Team photo", "wide")}
       <div class="card-grid three research-preview-grid">${homeDirections.map((x, index) => `
         <article class="research-preview-card">
+          ${adminGroupButton(`root.${lang}.home.highlights.${index}`, x.title)}
           ${editableImage(x.image, `root.${lang}.home.highlights.${index}.image`, x.title, "research")}
           <div>
             ${editableText(x.title, `root.${lang}.home.highlights.${index}.title`, "h3")}
@@ -745,6 +771,7 @@ function renderHome() {
       <div class="section-head">
         <h2>${lang === "zh" ? "代表作" : "Representative Papers"}</h2>
       </div>
+      ${adminAddButton(`root.${lang}.papers.items`, "paper", lang === "zh" ? "新增论文" : "Add paper")}
       <div class="home-paper-grid">
         ${featuredPapers.map(({ paper, index }) => homePaperCard(paper, index)).join("")}
       </div>
@@ -756,7 +783,9 @@ function memberCard(m, basePath = "") {
   m = enrichedMember(m);
   const image = editableImage(m.image, basePath ? `${basePath}.image` : "", m.name, "avatar") || avatarFallback(m.name);
   return `
-    <article class="member-card">
+      <article class="member-card">
+      ${adminGroupButton(basePath, m.name)}
+      ${adminDeleteButton(basePath, m.name)}
       ${image}
       <div>
         <h3>${editableInline(m.name, basePath ? `${basePath}.name` : "")} <span>${editableInline(m.cn || "", basePath ? `${basePath}.cn` : "")}</span></h3>
@@ -771,6 +800,28 @@ function memberCard(m, basePath = "") {
   `;
 }
 
+function memberBasePath(member, collectionPath, sections = []) {
+  if (Number.isInteger(member?._sourceSectionIndex) && Number.isInteger(member?._sourceMemberIndex)) {
+    return `${collectionPath}.${member._sourceSectionIndex}.members.${member._sourceMemberIndex}`;
+  }
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+    const memberIndex = (sections[sectionIndex].members || []).findIndex((candidate) => {
+      return (candidate.email && candidate.email === member.email)
+        || (candidate.name && candidate.name === member.name && (candidate.cn || "") === (member.cn || ""));
+    });
+    if (memberIndex >= 0) return `${collectionPath}.${sectionIndex}.members.${memberIndex}`;
+  }
+  return "";
+}
+
+function firstMemberCollectionPath(section, fallbackPath) {
+  const first = section?.members?.[0];
+  if (Number.isInteger(first?._sourceSectionIndex)) {
+    return `root.${lang}.team.sections.${first._sourceSectionIndex}.members`;
+  }
+  return fallbackPath;
+}
+
 function piCard(pi) {
   pi = enrichedMember(pi);
   const primaryName = lang === "zh" ? (pi.cn || pi.name) : pi.name;
@@ -778,6 +829,7 @@ function piCard(pi) {
   const basePath = `root.${lang}.team.pi`;
   return `
     <article class="pi-card">
+      ${adminGroupButton(basePath, primaryName)}
       <div class="pi-photo">
         ${editableImage(pi.image, `${basePath}.image`, pi.name, "avatar") || avatarFallback(pi.name)}
       </div>
@@ -819,24 +871,25 @@ function renderTeam() {
     </section>
     ${sections.map((section) => `
       <section class="content-section">
-        <div class="section-head"><h2>${esc(section.title)}</h2></div>
-        <div class="member-grid">${section.members.map(memberCard).join("")}</div>
+        <div class="section-head"><h2>${esc(section.title)}</h2>${adminAddButton(firstMemberCollectionPath(section, `root.${lang}.team.sections.1.members`), "teamMember", section.title)}</div>
+        <div class="member-grid">${section.members.map((member) => memberCard(member, memberBasePath(member, `root.${lang}.team.sections`, t.sections || []))).join("")}</div>
       </section>
     `).join("")}
   `;
   const alumniContent = (t.alumniSections || []).length ? `
     <section class="content-section alumni-section">
       <div class="section-head"><h2>${lang === "zh" ? "已毕业成员" : "Alumni"}</h2></div>
-      ${t.alumniSections.map((section) => `
+      ${t.alumniSections.map((section, sectionIndex) => `
         <div class="alumni-group">
           <h3>${esc(section.title)}</h3>
-          <div class="member-grid">${section.members.map(memberCard).join("")}</div>
+          ${adminAddButton(`root.${lang}.team.alumniSections.${sectionIndex}.members`, "teamMember", section.title)}
+          <div class="member-grid">${section.members.map((member) => memberCard(member, memberBasePath(member, `root.${lang}.team.alumniSections`, t.alumniSections || []))).join("")}</div>
         </div>
       `).join("")}
     </section>
   ` : "";
   renderShell(`
-    ${pageHero(t.title, t.intro, `root.${lang}.team.title`, `root.${lang}.team.intro`)}
+    ${pageHero(t.title, t.intro, `root.${lang}.team.title`, `root.${lang}.team.intro`, `root.${lang}.team`)}
     <section class="content-section compact-section">
       <div class="tab-strip" data-filter="team-tab">
         <button type="button" data-value="current" class="${teamTab === "current" ? "active" : ""}">${lang === "zh" ? "当前成员" : "Current"}</button>
@@ -869,8 +922,9 @@ function renderPapers() {
   paperPage = Math.min(Math.max(1, paperPage), totalPages);
   const pageItems = filtered.slice((paperPage - 1) * PAGE_SIZE, paperPage * PAGE_SIZE);
   renderShell(`
-    ${pageHero(p.title, p.intro, `root.${lang}.papers.title`, `root.${lang}.papers.intro`)}
+    ${pageHero(p.title, p.intro, `root.${lang}.papers.title`, `root.${lang}.papers.intro`, `root.${lang}.papers`)}
     <section class="content-section">
+      ${adminAddButton(`root.${lang}.papers.items`, "paper", lang === "zh" ? "新增论文" : "Add paper")}
       <div class="tab-strip" data-filter="paper-tab">
         <button type="button" data-value="featured" class="${paperTab === "featured" ? "active" : ""}">${esc(p.tabs?.featured || "Featured")}</button>
         <button type="button" data-value="all" class="${paperTab === "all" ? "active" : ""}">${esc(p.tabs?.all || "All")}</button>
@@ -926,16 +980,17 @@ function renderResearch() {
   const r = d.research;
   const resources = d.resources?.items || [];
   renderShell(`
-    ${pageHero(r.title, r.intro, `root.${lang}.research.title`, `root.${lang}.research.intro`)}
+    ${pageHero(r.title, r.intro, `root.${lang}.research.title`, `root.${lang}.research.intro`, `root.${lang}.research`)}
     <section class="content-section">
-      <div class="section-head"><h2>${lang === "zh" ? "研究方向" : "Research Directions"}</h2></div>
-      <div class="card-grid direction-grid">${r.directions.map((x, index) => `<article>${editableText(x.title, `root.${lang}.research.directions.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.research.directions.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
+      <div class="section-head"><h2>${lang === "zh" ? "研究方向" : "Research Directions"}</h2>${adminAddButton(`root.${lang}.research.directions`, "researchDirection", lang === "zh" ? "新增研究方向" : "Add direction")}</div>
+      <div class="card-grid direction-grid">${r.directions.map((x, index) => `<article>${adminGroupButton(`root.${lang}.research.directions.${index}`, x.title)}${adminDeleteButton(`root.${lang}.research.directions.${index}`, x.title)}${editableText(x.title, `root.${lang}.research.directions.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.research.directions.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
     </section>
     <section class="content-section band">
       <div class="section-head">
         <h2>${lang === "zh" ? "开放数据与代码资源" : "Open Data & Code Resources"}</h2>
         <p>${esc(d.resources?.intro || "")}</p>
       </div>
+      ${adminAddButton(`root.${lang}.resources.items`, "resource", lang === "zh" ? "新增资源" : "Add resource")}
       <div class="resource-grid merged">
         ${resources.map((item, index) => resourceCard(item, index)).join("")}
       </div>
@@ -952,7 +1007,7 @@ function renderNews() {
   newsPage = Math.min(Math.max(1, newsPage), totalPages);
   const pageItems = filtered.slice((newsPage - 1) * PAGE_SIZE, newsPage * PAGE_SIZE);
   renderShell(`
-    ${pageHero(n.title, n.intro, `root.${lang}.news.title`, `root.${lang}.news.intro`)}
+    ${pageHero(n.title, n.intro, `root.${lang}.news.title`, `root.${lang}.news.intro`, `root.${lang}.news`)}
     <section class="content-section">
       <div class="filter-panel news-filter">
         <div class="filter-block">
@@ -960,6 +1015,7 @@ function renderNews() {
           ${chipGroup("news-year", years, newsYear, n.filterLabels?.allYears || "All years")}
         </div>
       </div>
+      ${adminAddButton(`root.${lang}.news.items`, "news", lang === "zh" ? "新增新闻" : "Add news")}
       <div class="paper-list news-list">
         ${pageItems.map(({ item, index }) => newsItemCard(item, index)).join("")}
       </div>
@@ -984,8 +1040,9 @@ function renderNews() {
 function renderResources() {
   const r = data().resources;
   renderShell(`
-    ${pageHero(r.title, r.intro, `root.${lang}.resources.title`, `root.${lang}.resources.intro`)}
+    ${pageHero(r.title, r.intro, `root.${lang}.resources.title`, `root.${lang}.resources.intro`, `root.${lang}.resources`)}
     <section class="content-section">
+      ${adminAddButton(`root.${lang}.resources.items`, "resource", lang === "zh" ? "新增资源" : "Add resource")}
       <div class="resource-grid">
         ${r.items.map((item, index) => resourceCard(item, index)).join("")}
       </div>
@@ -996,15 +1053,16 @@ function renderResources() {
 function renderJoin() {
   const j = data().join;
   renderShell(`
-    ${pageHero(j.title, j.intro, `root.${lang}.join.title`, `root.${lang}.join.intro`)}
+    ${pageHero(j.title, j.intro, `root.${lang}.join.title`, `root.${lang}.join.intro`, `root.${lang}.join`)}
     <section class="join-page">
+      ${adminGroupButton(`root.${lang}.join`, j.title)}
       ${editableImage(j.image, `root.${lang}.join.image`, "Team", "wide")}
       <div>
         <h2>AI for Climate</h2>
         ${editableText(j.body, `root.${lang}.join.body`, "p", "", "long")}
-        <div class="card-grid">${j.benefits.map((x, index) => `<article>${editableText(x.title, `root.${lang}.join.benefits.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.join.benefits.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
+        <div class="card-grid">${j.benefits.map((x, index) => `<article>${adminGroupButton(`root.${lang}.join.benefits.${index}`, x.title)}${editableText(x.title, `root.${lang}.join.benefits.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.join.benefits.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
         <h2 class="compact-title">${lang === "zh" ? "开放岗位" : "Open Positions"}</h2>
-        <div class="card-grid">${(j.openings || []).map((x, index) => `<article>${editableText(x.title, `root.${lang}.join.openings.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.join.openings.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
+        <div class="card-grid">${(j.openings || []).map((x, index) => `<article>${adminGroupButton(`root.${lang}.join.openings.${index}`, x.title)}${editableText(x.title, `root.${lang}.join.openings.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.join.openings.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
         <h2 class="compact-title">${lang === "zh" ? "申请材料" : "Application Materials"}</h2>
         <ul class="material-list">${(j.materials || []).map((x, index) => `<li>${editableInline(x, `root.${lang}.join.materials.${index}`, "long")}</li>`).join("")}</ul>
         <a class="button primary wide" href="${safeHref(j.contact.href)}">${editableInline(j.contact.text, `root.${lang}.join.contact.text`)}</a>
@@ -1016,8 +1074,9 @@ function renderJoin() {
 function renderContact() {
   const c = data().contact;
   renderShell(`
-    ${pageHero(c.title, c.intro, `root.${lang}.contact.title`, `root.${lang}.contact.intro`)}
+    ${pageHero(c.title, c.intro, `root.${lang}.contact.title`, `root.${lang}.contact.intro`, `root.${lang}.contact`)}
     <section class="contact-section">
+      ${adminGroupButton(`root.${lang}.contact`, c.title)}
       <a class="button primary wide" href="${safeHref(c.email.href)}">${editableInline(c.email.text, `root.${lang}.contact.email.text`)}</a>
       ${c.links.map((l, index) => `<a href="${safeHref(l.href)}" ${linkAttrs(l.href)}>${editableInline(l.text, `root.${lang}.contact.links.${index}.text`)}</a>`).join("")}
     </section>
@@ -1035,6 +1094,22 @@ function pathSet(obj, path, value) {
   }
   if (BLOCKED_MERGE_KEYS.has(parts[0])) return;
   cursor[parts[0]] = value;
+}
+
+function pathDelete(obj, path) {
+  const parts = path.split(".");
+  const key = parts.pop();
+  const parent = parts.reduce((cursor, part) => BLOCKED_MERGE_KEYS.has(part) ? undefined : cursor?.[part], obj);
+  if (!parent || BLOCKED_MERGE_KEYS.has(key)) return false;
+  if (Array.isArray(parent) && /^\d+$/.test(key)) {
+    parent.splice(Number(key), 1);
+    return true;
+  }
+  if (Object.prototype.hasOwnProperty.call(parent, key)) {
+    delete parent[key];
+    return true;
+  }
+  return false;
 }
 
 function pathGet(obj, path) {
@@ -1197,6 +1272,22 @@ function installAdminHandlers() {
     });
   });
 
+  document.querySelectorAll("[data-inline-add]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openAddEditor(button.dataset.inlineAdd, button.dataset.addType || "item");
+    });
+  });
+
+  document.querySelectorAll("[data-inline-delete]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      deleteInlineItem(button.dataset.inlineDelete);
+    });
+  });
+
   document.querySelectorAll(".site-header a, .mobile-drawer a").forEach((link) => {
     link.addEventListener("click", (event) => {
       const route = routeFromAdminHref(link.getAttribute("href") || "");
@@ -1285,7 +1376,204 @@ function closeInlineEditor() {
   $("#inline-edit-modal")?.setAttribute("hidden", "");
 }
 
+function isPlainEditableObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectGroupFields(value, basePath, depth = 0) {
+  if (!isPlainEditableObject(value) || depth > 3) return [];
+  return Object.entries(value).flatMap(([key, child]) => {
+    if (BLOCKED_MERGE_KEYS.has(key)) return [];
+    const path = `${basePath}.${key}`;
+    if (Array.isArray(child)) {
+      return child.every((item) => item == null || ["string", "number", "boolean"].includes(typeof item))
+        ? [{ path, key, value: child.join(", ") }]
+        : [];
+    }
+    if (isPlainEditableObject(child)) return collectGroupFields(child, path, depth + 1);
+    return [{ path, key, value: child }];
+  });
+}
+
+function fieldLabel(path) {
+  return path.replace(/^root\./, "").split(".").slice(-2).join(".");
+}
+
+function groupFieldControl(field) {
+  const value = field.value;
+  const path = field.path;
+  if (typeof value === "boolean") {
+    return `
+      <label class="inline-edit-field inline-edit-field--checkbox">
+        <span>${esc(fieldLabel(path))}</span>
+        <input data-inline-field="${esc(path)}" type="checkbox" ${value ? "checked" : ""} />
+      </label>
+    `;
+  }
+  const stringValue = value == null ? "" : String(value);
+  const long = /title|intro|copy|body|bio|abstract|description/i.test(path) || stringValue.length > 80;
+  const mediaUpload = isImageField(path) ? `
+    <label class="inline-edit-field inline-edit-field--upload">
+      <span>${lang === "zh" ? "上传图片" : "Upload image"}</span>
+      <input data-inline-file="${esc(path)}" type="file" accept="image/*" />
+    </label>
+  ` : "";
+  return `
+    <label class="inline-edit-field">
+      <span>${esc(fieldLabel(path))}</span>
+      ${long ? `<textarea data-inline-field="${esc(path)}">${esc(stringValue)}</textarea>` : `<input data-inline-field="${esc(path)}" value="${esc(stringValue)}" />`}
+    </label>
+    ${mediaUpload}
+  `;
+}
+
+function groupEditorControl(path, value) {
+  const fields = collectGroupFields(value, path);
+  if (!fields.length) {
+    return `<p class="inline-edit-empty">${lang === "zh" ? "这一组没有可直接编辑的文本、图片或开关字段，请使用高级编辑。" : "This group has no directly editable text, image, or toggle fields. Use advanced edit."}</p>`;
+  }
+  return `
+    <div class="inline-edit-grid">
+      ${fields.map(groupFieldControl).join("")}
+    </div>
+    <p class="inline-edit-hint">${lang === "zh" ? "列表增删、复杂结构和数组内容请在右侧高级编辑中调整。" : "Use advanced edit for adding/removing list items and complex array content."}</p>
+  `;
+}
+
+function blankItem(type) {
+  const year = String(new Date().getFullYear());
+  const templates = {
+    paper: {
+      year,
+      title: "",
+      authors: "",
+      journal: "",
+      tags: "",
+      link: "",
+      featured: false,
+      homeFeatured: false
+    },
+    news: {
+      date: new Date().toISOString().slice(0, 10),
+      title: "",
+      copy: "",
+      image: "",
+      link: ""
+    },
+    resource: {
+      title: "",
+      copy: "",
+      image: "",
+      link: ""
+    },
+    researchDirection: {
+      title: "",
+      copy: "",
+      image: ""
+    },
+    teamMember: {
+      name: "",
+      cn: "",
+      role: lang === "zh" ? "在读博士" : "PhD Student",
+      started: "",
+      destination: "",
+      bio: "",
+      image: "",
+      email: ""
+    }
+  };
+  return structuredClone(templates[type] || templates.resource);
+}
+
+function normalizeAddedItem(type, item) {
+  if (type === "paper") {
+    return {
+      ...item,
+      tags: typeof item.tags === "string"
+        ? item.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean)
+        : (item.tags || [])
+    };
+  }
+  return item;
+}
+
+function normalizeInlineValue(path, value, field) {
+  if (/\.tags$/.test(path)) {
+    return String(value || "").split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
+  }
+  return field?.type === "checkbox" ? Boolean(value) : value;
+}
+
+function openAddEditor(path, type = "item") {
+  syncAdminFields();
+  const cleanPath = path.replace(/^root\./, "");
+  const value = blankItem(type);
+  const modal = $("#inline-edit-modal");
+  const body = $("#inline-edit-body");
+  if (!modal || !body) return;
+  modal.removeAttribute("hidden");
+  modal.dataset.path = cleanPath;
+  modal.dataset.type = "add";
+  modal.dataset.addType = type;
+  $("#inline-edit-title").textContent = lang === "zh" ? "新增卡片" : "Add Card";
+  body.innerHTML = groupEditorControl(path, value);
+
+  document.querySelectorAll("[data-inline-file]").forEach((input) => {
+    input.addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+        alert("请选择 2MB 以内的图片文件。");
+        input.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        const field = $(`[data-inline-field="${CSS.escape(input.dataset.inlineFile)}"]`);
+        if (field) field.value = reader.result;
+      });
+      reader.readAsDataURL(file);
+    });
+  });
+
+  document.querySelectorAll("[data-inline-close]").forEach((button) => {
+    button.addEventListener("click", closeInlineEditor, { once: true });
+  });
+
+  $("#inline-edit-form").onsubmit = (event) => {
+    event.preventDefault();
+    const nextItem = {};
+    document.querySelectorAll("[data-inline-field]").forEach((field) => {
+      const key = field.dataset.inlineField.split(".").pop();
+      nextItem[key] = normalizeInlineValue(field.dataset.inlineField, field.type === "checkbox" ? field.checked : field.value, field);
+    });
+    const collection = pathGet(siteData, cleanPath);
+    if (Array.isArray(collection)) {
+      collection.unshift(normalizeAddedItem(type, nextItem));
+    }
+    closeInlineEditor();
+    paperPage = 1;
+    newsPage = 1;
+    renderAdminPreview();
+  };
+}
+
+function deleteInlineItem(path) {
+  if (!path) return;
+  syncAdminFields();
+  const label = lang === "zh" ? "确定删除这张卡片吗？" : "Delete this card?";
+  if (!confirm(label)) return;
+  pathDelete(siteData, path.replace(/^root\./, ""));
+  closeInlineEditor();
+  paperPage = 1;
+  newsPage = 1;
+  renderAdminPreview();
+}
+
 function inlineEditorControl(path, type, value) {
+  if (type === "group" && isPlainEditableObject(value)) {
+    return groupEditorControl(path, value);
+  }
   if (type === "image") {
     return `
       <label class="inline-edit-field">
@@ -1331,7 +1619,7 @@ function openInlineEditor(path, type = "text") {
   body.innerHTML = inlineEditorControl(path, type, value);
   installImageFallbacks(body);
 
-  $("#inline-edit-file")?.addEventListener("change", (event) => {
+  const handleInlineUpload = (event, targetPath = "") => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
@@ -1341,10 +1629,21 @@ function openInlineEditor(path, type = "text") {
     }
     const reader = new FileReader();
     reader.addEventListener("load", () => {
-      const field = $("#inline-edit-value");
+      const selector = targetPath ? `[data-inline-field="${CSS.escape(targetPath)}"]` : "#inline-edit-value";
+      const field = $(selector);
       if (field) field.value = reader.result;
     });
     reader.readAsDataURL(file);
+  };
+
+  $("#inline-edit-file")?.addEventListener("change", (event) => {
+    handleInlineUpload(event);
+  });
+
+  document.querySelectorAll("[data-inline-file]").forEach((input) => {
+    input.addEventListener("change", (event) => {
+      handleInlineUpload(event, input.dataset.inlineFile);
+    });
   });
 
   document.querySelectorAll("[data-inline-close]").forEach((button) => {
@@ -1353,6 +1652,15 @@ function openInlineEditor(path, type = "text") {
 
   $("#inline-edit-form").onsubmit = (event) => {
     event.preventDefault();
+    if (modal.dataset.type === "group") {
+      document.querySelectorAll("[data-inline-field]").forEach((field) => {
+        const nextValue = field.type === "checkbox" ? field.checked : field.value;
+        pathSet(siteData, field.dataset.inlineField.replace(/^root\./, ""), normalizeInlineValue(field.dataset.inlineField, nextValue, field));
+      });
+      closeInlineEditor();
+      renderAdminPreview();
+      return;
+    }
     const field = $("#inline-edit-value");
     const nextValue = field?.type === "checkbox" ? field.checked : field?.value;
     pathSet(siteData, modal.dataset.path, nextValue ?? "");
@@ -1424,7 +1732,9 @@ function normalizeCurrentTeamSections(rawSections = [], langKey = "zh") {
   const source = rawSections.filter((section, index) => index !== 0);
   const allMembers = source.flatMap((section) => (section.members || []).map((member) => ({
     ...member,
-    _sectionTitle: section.title
+    _sectionTitle: section.title,
+    _sourceSectionIndex: rawSections.indexOf(section),
+    _sourceMemberIndex: (section.members || []).indexOf(member)
   })));
   const isBinbin = (member) => /曾斌斌|Binbin Zeng/.test(`${member.name || ""} ${member.cn || ""}`);
   const titleMap = langKey === "zh"
