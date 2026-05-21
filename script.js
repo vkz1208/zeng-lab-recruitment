@@ -70,6 +70,26 @@ function cardImage(src, alt = "", type = "card", extraClass = "") {
   return `<img class="${classes}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" />`;
 }
 
+function adminEditButton(path, label = "", type = "text") {
+  if (!adminMode || !path) return "";
+  return `<button class="inline-edit-button" type="button" data-inline-edit="${esc(path)}" data-edit-type="${esc(type)}" aria-label="${esc(label || path)}">编辑</button>`;
+}
+
+function editableText(value, path, tag = "span", className = "", type = "text") {
+  const classes = ["editable-fragment", className].filter(Boolean).join(" ");
+  return `<${tag} class="${classes}"><span class="editable-value">${esc(value)}</span>${adminEditButton(path, value, type)}</${tag}>`;
+}
+
+function editableInline(value, path, type = "text") {
+  return `${esc(value)}${adminEditButton(path, value, type)}`;
+}
+
+function editableImage(src, path, alt = "", type = "card", extraClass = "") {
+  const image = cardImage(src, alt, type, extraClass);
+  if (!adminMode || !path || !image) return image;
+  return `<span class="editable-media">${image}${adminEditButton(path, alt || path, "image")}</span>`;
+}
+
 function installImageFallbacks(root = app) {
   root.querySelectorAll("img").forEach((img) => {
     img.addEventListener("error", () => {
@@ -525,13 +545,13 @@ function mergeData(base, patch) {
   return base;
 }
 
-function pageHero(title, intro) {
+function pageHero(title, intro, titlePath = "", introPath = "") {
   return `
     <section class="page-hero">
       <div class="main-container">
         <p class="eyebrow">${esc(data().meta.labName)}</p>
-        <h1>${esc(title)}</h1>
-        <p>${esc(intro)}</p>
+        ${editableText(title, titlePath, "h1")}
+        ${editableText(intro, introPath, "p", "", "long")}
       </div>
     </section>
   `;
@@ -551,63 +571,67 @@ function isHomeRepresentativePaper(paper) {
   return isEnabledFlag(paper.homeFeatured);
 }
 
-function homePaperCard(paper) {
-  const clickable = isClickableHref(paper.link);
+function homePaperCard(paper, index = -1) {
+  const basePath = index >= 0 ? `root.${lang}.papers.items.${index}` : "";
+  const clickable = !adminMode && isClickableHref(paper.link);
   const tag = clickable ? "a" : "article";
   const attrs = clickable ? ` href="${safeHref(paper.link)}" ${linkAttrs(paper.link)}` : "";
   return `
     <${tag} class="home-paper-card ${clickable ? "is-clickable" : "is-static"}"${attrs}>
-      <span>${esc(paper.year)} · ${esc(paper.journal)}</span>
-      <strong>${esc(paper.title)}</strong>
-      <p>${esc(paper.authors)}</p>
+      <span>${editableInline(paper.year, `${basePath}.year`)} · ${editableInline(paper.journal, `${basePath}.journal`)}</span>
+      <strong>${editableInline(paper.title, `${basePath}.title`, "long")}</strong>
+      ${editableText(paper.authors, `${basePath}.authors`, "p", "", "long")}
     </${tag}>
   `;
 }
 
-function paperRow(paper) {
-  const clickable = isClickableHref(paper.link);
+function paperRow(paper, index = -1) {
+  const basePath = index >= 0 ? `root.${lang}.papers.items.${index}` : "";
+  const clickable = !adminMode && isClickableHref(paper.link);
   const tag = clickable ? "a" : "article";
   const attrs = clickable ? ` href="${safeHref(paper.link)}" ${linkAttrs(paper.link)}` : "";
   return `
     <${tag} class="paper-row ${clickable ? "is-clickable" : "is-static"}"${attrs}>
-      <span>${esc(paper.year)}</span>
+      <span>${editableInline(paper.year, `${basePath}.year`)}</span>
       <div>
-        <strong>${esc(paper.title)}</strong>
-        <p>${esc(paper.authors)} · ${esc(paper.journal)}</p>
+        <strong>${editableInline(paper.title, `${basePath}.title`, "long")}</strong>
+        <p>${editableInline(paper.authors, `${basePath}.authors`, "long")} · ${editableInline(paper.journal, `${basePath}.journal`)}</p>
         ${(paper.tags || []).length ? `<div class="tag-list">${paper.tags.map((tag) => `<em>${esc(tag)}</em>`).join("")}</div>` : ""}
       </div>
     </${tag}>
   `;
 }
 
-function resourceCard(item) {
-  const clickable = isClickableHref(item.link);
+function resourceCard(item, index = -1) {
+  const basePath = index >= 0 ? `root.${lang}.resources.items.${index}` : "";
+  const clickable = !adminMode && isClickableHref(item.link);
   const tag = clickable ? "a" : "article";
   const attrs = clickable ? ` href="${safeHref(item.link)}" ${linkAttrs(item.link)}` : "";
   const wideThumb = /GGWS|Fig1|floating/i.test(item.image || "");
   return `
     <${tag} class="resource-card ${wideThumb ? "resource-card--wide-thumb" : ""} ${clickable ? "is-clickable" : "is-static"}"${attrs}>
-      ${cardImage(item.image, item.title, "resource")}
+      ${editableImage(item.image, `${basePath}.image`, item.title, "resource")}
       <div>
-        <h3>${esc(item.title)}</h3>
-        <p>${esc(item.copy)}</p>
+        ${editableText(item.title, `${basePath}.title`, "h3")}
+        ${editableText(item.copy, `${basePath}.copy`, "p", "", "long")}
       </div>
     </${tag}>
   `;
 }
 
-function newsItemCard(item) {
-  const clickable = isClickableHref(item.link);
+function newsItemCard(item, index = -1) {
+  const basePath = index >= 0 ? `root.${lang}.news.items.${index}` : "";
+  const clickable = !adminMode && isClickableHref(item.link);
   const className = item.image ? "news-card" : "paper-row news-row";
   const tag = clickable ? "a" : "article";
   const attrs = clickable ? ` href="${hrefToRoute(item.link)}" ${linkAttrs(item.link)}` : "";
   return `
     <${tag} class="${className} ${clickable ? "is-clickable" : "is-static"}"${attrs}>
-      ${cardImage(item.image, item.title, "news") || `<span>${esc(item.date)}</span>`}
+      ${editableImage(item.image, `${basePath}.image`, item.title, "news") || `<span>${editableInline(item.date, `${basePath}.date`)}</span>`}
       <div>
-        ${item.image ? `<span>${esc(item.date)}</span>` : ""}
-        <strong>${esc(item.title)}</strong>
-        <p>${esc(item.copy)}</p>
+        ${item.image ? `<span>${editableInline(item.date, `${basePath}.date`)}</span>` : ""}
+        <strong>${editableInline(item.title, `${basePath}.title`, "long")}</strong>
+        ${editableText(item.copy, `${basePath}.copy`, "p", "", "long")}
       </div>
     </${tag}>
   `;
@@ -672,45 +696,47 @@ function renderHome() {
   const d = data();
   const h = d.home;
   const homeDirections = h.highlights || [];
-  const featuredPapers = (d.papers?.items || []).filter(isHomeRepresentativePaper);
+  const featuredPapers = (d.papers?.items || [])
+    .map((paper, index) => ({ paper, index }))
+    .filter(({ paper }) => isHomeRepresentativePaper(paper));
   renderShell(`
     <section class="hero">
-      ${cardImage(h.heroImage, "AI for Climate", "hero", "hero-bg")}
+      ${editableImage(h.heroImage, `root.${lang}.home.heroImage`, "AI for Climate", "hero", "hero-bg")}
       <div class="hero-overlay"></div>
       <div class="hero-inner main-container">
         <div class="hero-lab-name">
           <div class="hero-lab-lockup">
-            <span class="hero-lab-mark"><img src="assets/branding/lab-logo.png" alt="${esc(d.meta.labName)}" /></span>
+            <span class="hero-lab-mark">${editableImage("assets/branding/lab-logo.png", "", d.meta.labName, "avatar")}</span>
             <span>
-              <strong>${esc(d.meta.labName)}</strong>
-              <small>${esc(d.meta.labNameEn)}</small>
+              <strong>${editableInline(d.meta.labName, `root.${lang}.meta.labName`)}</strong>
+              <small>${editableInline(d.meta.labNameEn, `root.${lang}.meta.labNameEn`)}</small>
             </span>
           </div>
         </div>
-        <p class="eyebrow">${esc(h.eyebrow)}</p>
-        <h1>${esc(h.title)}</h1>
-        <p class="hero-copy">${esc(h.copy)}</p>
+        ${editableText(h.eyebrow, `root.${lang}.home.eyebrow`, "p", "eyebrow")}
+        ${editableText(h.title, `root.${lang}.home.title`, "h1")}
+        ${editableText(h.copy, `root.${lang}.home.copy`, "p", "hero-copy", "long")}
         <div class="hero-actions">
-          <a class="button primary" href="${hrefToRoute(h.primary.href)}">${esc(h.primary.text)}</a>
-          <a class="button secondary" href="${hrefToRoute(h.secondary.href)}">${esc(h.secondary.text)}</a>
+          <a class="button primary" href="${hrefToRoute(h.primary.href)}">${editableInline(h.primary.text, `root.${lang}.home.primary.text`)}</a>
+          <a class="button secondary" href="${hrefToRoute(h.secondary.href)}">${editableInline(h.secondary.text, `root.${lang}.home.secondary.text`)}</a>
         </div>
-        <div class="hero-stats">${h.stats.map((s) => `<div><strong>${esc(s.value)}</strong><span>${esc(s.label)}</span></div>`).join("")}</div>
+        <div class="hero-stats">${h.stats.map((s, index) => `<div><strong>${editableInline(s.value, `root.${lang}.home.stats.${index}.value`)}</strong><span>${editableInline(s.label, `root.${lang}.home.stats.${index}.label`)}</span></div>`).join("")}</div>
       </div>
     </section>
     <section class="split band">
       <div>
-        <h2>${esc(h.featureTitle)}</h2>
+        ${editableText(h.featureTitle, `root.${lang}.home.featureTitle`, "h2")}
       </div>
-      <p class="home-feature-copy">${esc(h.featureCopy)}</p>
+      ${editableText(h.featureCopy, `root.${lang}.home.featureCopy`, "p", "home-feature-copy", "long")}
     </section>
     <section class="media-section">
-      ${cardImage(h.teamImage, "Team photo", "wide")}
-      <div class="card-grid three research-preview-grid">${homeDirections.map((x) => `
+      ${editableImage(h.teamImage, `root.${lang}.home.teamImage`, "Team photo", "wide")}
+      <div class="card-grid three research-preview-grid">${homeDirections.map((x, index) => `
         <article class="research-preview-card">
-          ${cardImage(x.image, x.title, "research")}
+          ${editableImage(x.image, `root.${lang}.home.highlights.${index}.image`, x.title, "research")}
           <div>
-            <h3>${esc(x.title)}</h3>
-            <p>${esc(x.copy)}</p>
+            ${editableText(x.title, `root.${lang}.home.highlights.${index}.title`, "h3")}
+            ${editableText(x.copy, `root.${lang}.home.highlights.${index}.copy`, "p", "", "long")}
           </div>
         </article>
       `).join("")}</div>
@@ -720,24 +746,24 @@ function renderHome() {
         <h2>${lang === "zh" ? "代表作" : "Representative Papers"}</h2>
       </div>
       <div class="home-paper-grid">
-        ${featuredPapers.map(homePaperCard).join("")}
+        ${featuredPapers.map(({ paper, index }) => homePaperCard(paper, index)).join("")}
       </div>
     </section>
   `);
 }
 
-function memberCard(m) {
+function memberCard(m, basePath = "") {
   m = enrichedMember(m);
-  const image = cardImage(m.image, m.name, "avatar") || avatarFallback(m.name);
+  const image = editableImage(m.image, basePath ? `${basePath}.image` : "", m.name, "avatar") || avatarFallback(m.name);
   return `
     <article class="member-card">
       ${image}
       <div>
-        <h3>${esc(m.name)} <span>${esc(m.cn || "")}</span></h3>
-        <p class="role">${esc(m.role || "")}</p>
-        ${m.started ? `<p>${esc(m.started)}</p>` : ""}
-        ${m.destination ? `<p class="destination">${lang === "zh" ? "去向：" : "Destination: "}${esc(m.destination)}</p>` : ""}
-        ${m.bio ? `<p>${esc(m.bio)}</p>` : ""}
+        <h3>${editableInline(m.name, basePath ? `${basePath}.name` : "")} <span>${editableInline(m.cn || "", basePath ? `${basePath}.cn` : "")}</span></h3>
+        ${editableText(m.role || "", basePath ? `${basePath}.role` : "", "p", "role")}
+        ${m.started ? editableText(m.started, basePath ? `${basePath}.started` : "", "p") : ""}
+        ${m.destination ? `<p class="destination">${lang === "zh" ? "去向：" : "Destination: "}${editableInline(m.destination, basePath ? `${basePath}.destination` : "")}</p>` : ""}
+        ${m.bio ? editableText(m.bio, basePath ? `${basePath}.bio` : "", "p", "", "long") : ""}
         ${(m.details || []).length ? `<ul class="member-details">${m.details.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : ""}
         ${m.email ? `<a href="mailto:${esc(m.email)}">${esc(m.email)}</a>` : ""}
       </div>
@@ -749,15 +775,16 @@ function piCard(pi) {
   pi = enrichedMember(pi);
   const primaryName = lang === "zh" ? (pi.cn || pi.name) : pi.name;
   const secondaryName = lang === "zh" ? pi.name : pi.cn;
+  const basePath = `root.${lang}.team.pi`;
   return `
     <article class="pi-card">
       <div class="pi-photo">
-        ${cardImage(pi.image, pi.name, "avatar") || avatarFallback(pi.name)}
+        ${editableImage(pi.image, `${basePath}.image`, pi.name, "avatar") || avatarFallback(pi.name)}
       </div>
       <div class="pi-body">
-        <h2>${esc(primaryName)} <span>${esc(secondaryName || "")}</span></h2>
-        <p class="role">${esc(pi.role || "")}</p>
-        <p>${esc(pi.bio || "")}</p>
+        <h2>${editableInline(primaryName, lang === "zh" ? `${basePath}.cn` : `${basePath}.name`)} <span>${editableInline(secondaryName || "", lang === "zh" ? `${basePath}.name` : `${basePath}.cn`)}</span></h2>
+        ${editableText(pi.role || "", `${basePath}.role`, "p", "role")}
+        ${editableText(pi.bio || "", `${basePath}.bio`, "p", "", "long")}
         <div class="pi-columns">
           <div>
             <h3>${lang === "zh" ? "教育经历" : "Education"}</h3>
@@ -809,7 +836,7 @@ function renderTeam() {
     </section>
   ` : "";
   renderShell(`
-    ${pageHero(t.title, t.intro)}
+    ${pageHero(t.title, t.intro, `root.${lang}.team.title`, `root.${lang}.team.intro`)}
     <section class="content-section compact-section">
       <div class="tab-strip" data-filter="team-tab">
         <button type="button" data-value="current" class="${teamTab === "current" ? "active" : ""}">${lang === "zh" ? "当前成员" : "Current"}</button>
@@ -829,10 +856,10 @@ function renderTeam() {
 
 function renderPapers() {
   const p = data().papers;
-  const items = p.items || [];
-  const years = [...new Set(items.map((paper) => yearOf(paper.year)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
-  const tags = [...new Set(items.flatMap((paper) => paper.tags || []))].sort();
-  const filtered = items.filter((paper) => {
+  const items = (p.items || []).map((paper, index) => ({ paper, index }));
+  const years = [...new Set(items.map(({ paper }) => yearOf(paper.year)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const tags = [...new Set(items.flatMap(({ paper }) => paper.tags || []))].sort();
+  const filtered = items.filter(({ paper }) => {
     const matchesTab = paperTab === "all" || isEnabledFlag(paper.featured);
     const matchesYear = paperYear === "all" || yearOf(paper.year) === paperYear;
     const matchesTag = paperTag === "all" || (paper.tags || []).includes(paperTag);
@@ -842,7 +869,7 @@ function renderPapers() {
   paperPage = Math.min(Math.max(1, paperPage), totalPages);
   const pageItems = filtered.slice((paperPage - 1) * PAGE_SIZE, paperPage * PAGE_SIZE);
   renderShell(`
-    ${pageHero(p.title, p.intro)}
+    ${pageHero(p.title, p.intro, `root.${lang}.papers.title`, `root.${lang}.papers.intro`)}
     <section class="content-section">
       <div class="tab-strip" data-filter="paper-tab">
         <button type="button" data-value="featured" class="${paperTab === "featured" ? "active" : ""}">${esc(p.tabs?.featured || "Featured")}</button>
@@ -859,7 +886,7 @@ function renderPapers() {
         </div>
       </div>
       <div class="paper-list">
-        ${pageItems.map(paperRow).join("")}
+        ${pageItems.map(({ paper, index }) => paperRow(paper, index)).join("")}
       </div>
       ${paginationControls("papers", paperPage, totalPages, filtered.length)}
     </section>
@@ -899,10 +926,10 @@ function renderResearch() {
   const r = d.research;
   const resources = d.resources?.items || [];
   renderShell(`
-    ${pageHero(r.title, r.intro)}
+    ${pageHero(r.title, r.intro, `root.${lang}.research.title`, `root.${lang}.research.intro`)}
     <section class="content-section">
       <div class="section-head"><h2>${lang === "zh" ? "研究方向" : "Research Directions"}</h2></div>
-      <div class="card-grid direction-grid">${r.directions.map((x) => `<article><h3>${esc(x.title)}</h3><p>${esc(x.copy)}</p></article>`).join("")}</div>
+      <div class="card-grid direction-grid">${r.directions.map((x, index) => `<article>${editableText(x.title, `root.${lang}.research.directions.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.research.directions.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
     </section>
     <section class="content-section band">
       <div class="section-head">
@@ -910,7 +937,7 @@ function renderResearch() {
         <p>${esc(d.resources?.intro || "")}</p>
       </div>
       <div class="resource-grid merged">
-        ${resources.map(resourceCard).join("")}
+        ${resources.map((item, index) => resourceCard(item, index)).join("")}
       </div>
     </section>
   `);
@@ -918,14 +945,14 @@ function renderResearch() {
 
 function renderNews() {
   const n = data().news;
-  const items = n.items || [];
-  const years = [...new Set(items.map((item) => yearOf(item.date)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
-  const filtered = items.filter((item) => newsYear === "all" || yearOf(item.date) === newsYear);
+  const items = (n.items || []).map((item, index) => ({ item, index }));
+  const years = [...new Set(items.map(({ item }) => yearOf(item.date)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const filtered = items.filter(({ item }) => newsYear === "all" || yearOf(item.date) === newsYear);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   newsPage = Math.min(Math.max(1, newsPage), totalPages);
   const pageItems = filtered.slice((newsPage - 1) * PAGE_SIZE, newsPage * PAGE_SIZE);
   renderShell(`
-    ${pageHero(n.title, n.intro)}
+    ${pageHero(n.title, n.intro, `root.${lang}.news.title`, `root.${lang}.news.intro`)}
     <section class="content-section">
       <div class="filter-panel news-filter">
         <div class="filter-block">
@@ -934,7 +961,7 @@ function renderNews() {
         </div>
       </div>
       <div class="paper-list news-list">
-        ${pageItems.map(newsItemCard).join("")}
+        ${pageItems.map(({ item, index }) => newsItemCard(item, index)).join("")}
       </div>
       ${paginationControls("news", newsPage, totalPages, filtered.length)}
     </section>
@@ -957,10 +984,10 @@ function renderNews() {
 function renderResources() {
   const r = data().resources;
   renderShell(`
-    ${pageHero(r.title, r.intro)}
+    ${pageHero(r.title, r.intro, `root.${lang}.resources.title`, `root.${lang}.resources.intro`)}
     <section class="content-section">
       <div class="resource-grid">
-        ${r.items.map(resourceCard).join("")}
+        ${r.items.map((item, index) => resourceCard(item, index)).join("")}
       </div>
     </section>
   `);
@@ -969,18 +996,18 @@ function renderResources() {
 function renderJoin() {
   const j = data().join;
   renderShell(`
-    ${pageHero(j.title, j.intro)}
+    ${pageHero(j.title, j.intro, `root.${lang}.join.title`, `root.${lang}.join.intro`)}
     <section class="join-page">
-      ${cardImage(j.image, "Team", "wide")}
+      ${editableImage(j.image, `root.${lang}.join.image`, "Team", "wide")}
       <div>
         <h2>AI for Climate</h2>
-        <p>${esc(j.body)}</p>
-        <div class="card-grid">${j.benefits.map((x) => `<article><h3>${esc(x.title)}</h3><p>${esc(x.copy)}</p></article>`).join("")}</div>
+        ${editableText(j.body, `root.${lang}.join.body`, "p", "", "long")}
+        <div class="card-grid">${j.benefits.map((x, index) => `<article>${editableText(x.title, `root.${lang}.join.benefits.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.join.benefits.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
         <h2 class="compact-title">${lang === "zh" ? "开放岗位" : "Open Positions"}</h2>
-        <div class="card-grid">${(j.openings || []).map((x) => `<article><h3>${esc(x.title)}</h3><p>${esc(x.copy)}</p></article>`).join("")}</div>
+        <div class="card-grid">${(j.openings || []).map((x, index) => `<article>${editableText(x.title, `root.${lang}.join.openings.${index}.title`, "h3")}${editableText(x.copy, `root.${lang}.join.openings.${index}.copy`, "p", "", "long")}</article>`).join("")}</div>
         <h2 class="compact-title">${lang === "zh" ? "申请材料" : "Application Materials"}</h2>
-        <ul class="material-list">${(j.materials || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-        <a class="button primary wide" href="${safeHref(j.contact.href)}">${esc(j.contact.text)}</a>
+        <ul class="material-list">${(j.materials || []).map((x, index) => `<li>${editableInline(x, `root.${lang}.join.materials.${index}`, "long")}</li>`).join("")}</ul>
+        <a class="button primary wide" href="${safeHref(j.contact.href)}">${editableInline(j.contact.text, `root.${lang}.join.contact.text`)}</a>
       </div>
     </section>
   `);
@@ -989,10 +1016,10 @@ function renderJoin() {
 function renderContact() {
   const c = data().contact;
   renderShell(`
-    ${pageHero(c.title, c.intro)}
+    ${pageHero(c.title, c.intro, `root.${lang}.contact.title`, `root.${lang}.contact.intro`)}
     <section class="contact-section">
-      <a class="button primary wide" href="${safeHref(c.email.href)}">${esc(c.email.text)}</a>
-      ${c.links.map((l) => `<a href="${safeHref(l.href)}" ${linkAttrs(l.href)}>${esc(l.text)}</a>`).join("")}
+      <a class="button primary wide" href="${safeHref(c.email.href)}">${editableInline(c.email.text, `root.${lang}.contact.email.text`)}</a>
+      ${c.links.map((l, index) => `<a href="${safeHref(l.href)}" ${linkAttrs(l.href)}>${editableInline(l.text, `root.${lang}.contact.links.${index}.text`)}</a>`).join("")}
     </section>
   `);
 }
@@ -1102,7 +1129,7 @@ function injectAdminChrome() {
         <span>${lang === "zh" ? "预览页面" : "Preview"}</span>
         <select id="admin-page-select">${adminRouteOptions()}</select>
       </label>
-      <button id="admin-panel-toggle" type="button">${adminPanelOpen ? (lang === "zh" ? "收起编辑" : "Hide editor") : (lang === "zh" ? "编辑内容" : "Edit content")}</button>
+      <button id="admin-panel-toggle" type="button">${adminPanelOpen ? (lang === "zh" ? "收起高级编辑" : "Hide advanced") : (lang === "zh" ? "高级编辑" : "Advanced edit")}</button>
       <button id="save-admin" class="save" type="button">${lang === "zh" ? "保存生效" : "Save"}</button>
       <button id="reset-admin" type="button">${lang === "zh" ? "恢复默认" : "Reset"}</button>
       <a class="button secondary" href="${hrefToRoute("/")}">${lang === "zh" ? "退出后台" : "Exit"}</a>
@@ -1120,6 +1147,23 @@ function injectAdminChrome() {
         ${renderEditor(siteData, "root")}
       </section>
     </aside>
+    <div class="inline-edit-modal" id="inline-edit-modal" hidden>
+      <div class="inline-edit-backdrop" data-inline-close></div>
+      <form class="inline-edit-dialog" id="inline-edit-form">
+        <div class="inline-edit-head">
+          <div>
+            <p class="eyebrow">Edit</p>
+            <h2 id="inline-edit-title">${lang === "zh" ? "编辑内容" : "Edit Content"}</h2>
+          </div>
+          <button type="button" data-inline-close aria-label="Close">×</button>
+        </div>
+        <div class="inline-edit-body" id="inline-edit-body"></div>
+        <div class="inline-edit-actions">
+          <button type="button" data-inline-close>${lang === "zh" ? "取消" : "Cancel"}</button>
+          <button class="save" type="submit">${lang === "zh" ? "应用" : "Apply"}</button>
+        </div>
+      </form>
+    </div>
   `);
   installImageFallbacks($("#admin-dock"));
   installAdminHandlers();
@@ -1136,13 +1180,21 @@ function installAdminHandlers() {
   $("#admin-panel-toggle")?.addEventListener("click", () => {
     adminPanelOpen = !adminPanelOpen;
     $("#admin-dock")?.classList.toggle("open", adminPanelOpen);
-    $("#admin-panel-toggle").textContent = adminPanelOpen ? (lang === "zh" ? "收起编辑" : "Hide editor") : (lang === "zh" ? "编辑内容" : "Edit content");
+    $("#admin-panel-toggle").textContent = adminPanelOpen ? (lang === "zh" ? "收起高级编辑" : "Hide advanced") : (lang === "zh" ? "高级编辑" : "Advanced edit");
   });
 
   $("#admin-dock-close")?.addEventListener("click", () => {
     adminPanelOpen = false;
     $("#admin-dock")?.classList.remove("open");
-    $("#admin-panel-toggle").textContent = lang === "zh" ? "编辑内容" : "Edit content";
+    $("#admin-panel-toggle").textContent = lang === "zh" ? "高级编辑" : "Advanced edit";
+  });
+
+  document.querySelectorAll("[data-inline-edit]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openInlineEditor(button.dataset.inlineEdit, button.dataset.editType || "text");
+    });
   });
 
   document.querySelectorAll(".site-header a, .mobile-drawer a").forEach((link) => {
@@ -1227,6 +1279,86 @@ function installAdminHandlers() {
     await saveServerData({});
     renderAdminPreview();
   });
+}
+
+function closeInlineEditor() {
+  $("#inline-edit-modal")?.setAttribute("hidden", "");
+}
+
+function inlineEditorControl(path, type, value) {
+  if (type === "image") {
+    return `
+      <label class="inline-edit-field">
+        <span>${lang === "zh" ? "图片路径" : "Image path"}</span>
+        <input id="inline-edit-value" value="${esc(value || "")}" />
+      </label>
+      <label class="inline-edit-field">
+        <span>${lang === "zh" ? "上传图片" : "Upload image"}</span>
+        <input id="inline-edit-file" type="file" accept="image/*" />
+      </label>
+      ${value ? `<div class="inline-edit-preview">${cardImage(value, path, imageTypeFromPath(path))}</div>` : ""}
+    `;
+  }
+  if (typeof value === "boolean") {
+    return `
+      <label class="inline-edit-field inline-edit-field--checkbox">
+        <span>${lang === "zh" ? "启用" : "Enabled"}</span>
+        <input id="inline-edit-value" type="checkbox" ${value ? "checked" : ""} />
+      </label>
+    `;
+  }
+  const stringValue = value == null ? "" : String(value);
+  const long = type === "long" || stringValue.length > 80;
+  return `
+    <label class="inline-edit-field">
+      <span>${esc(path.replace(/^root\./, ""))}</span>
+      ${long ? `<textarea id="inline-edit-value">${esc(stringValue)}</textarea>` : `<input id="inline-edit-value" value="${esc(stringValue)}" />`}
+    </label>
+  `;
+}
+
+function openInlineEditor(path, type = "text") {
+  syncAdminFields();
+  const cleanPath = path.replace(/^root\./, "");
+  const value = pathGet(siteData, cleanPath);
+  const modal = $("#inline-edit-modal");
+  const body = $("#inline-edit-body");
+  if (!modal || !body) return;
+  modal.removeAttribute("hidden");
+  modal.dataset.path = cleanPath;
+  modal.dataset.type = type;
+  $("#inline-edit-title").textContent = path.replace(/^root\./, "");
+  body.innerHTML = inlineEditorControl(path, type, value);
+  installImageFallbacks(body);
+
+  $("#inline-edit-file")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+      alert("请选择 2MB 以内的图片文件。");
+      event.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const field = $("#inline-edit-value");
+      if (field) field.value = reader.result;
+    });
+    reader.readAsDataURL(file);
+  });
+
+  document.querySelectorAll("[data-inline-close]").forEach((button) => {
+    button.addEventListener("click", closeInlineEditor, { once: true });
+  });
+
+  $("#inline-edit-form").onsubmit = (event) => {
+    event.preventDefault();
+    const field = $("#inline-edit-value");
+    const nextValue = field?.type === "checkbox" ? field.checked : field?.value;
+    pathSet(siteData, modal.dataset.path, nextValue ?? "");
+    closeInlineEditor();
+    renderAdminPreview();
+  };
 }
 
 function renderAdminPreview() {
