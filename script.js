@@ -1,9 +1,13 @@
-const PASSWORD = "zenglab2026";
 const STORAGE_KEY = "zeng-lab-full-site-data-v6";
 const PAGE_SIZE = 10;
+const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+const BLOCKED_MERGE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const app = document.querySelector("#app");
 
-let siteData = structuredClone(window.DEFAULT_SITE_DATA);
+let siteData = {
+  zh: structuredClone(window.DEFAULT_SITE_DATA.zh),
+  en: structuredClone(window.DEFAULT_SITE_DATA.en)
+};
 let lang = localStorage.getItem("zeng-lab-lang") || "zh";
 let paperTab = "featured";
 let paperYear = "all";
@@ -25,8 +29,25 @@ function esc(value = "") {
     .replaceAll('"', "&quot;");
 }
 
+function safeHref(href = "") {
+  const value = String(href || "").trim().replace(/[\u0000-\u001F"'<>`]/g, "");
+  if (!value) return "#";
+  if (value.startsWith("#") || value.startsWith("/")) return value;
+  try {
+    const url = new URL(value, window.location.origin);
+    return SAFE_PROTOCOLS.has(url.protocol) ? value : "#";
+  } catch {
+    return "#";
+  }
+}
+
+function isClickableHref(href = "") {
+  return safeHref(href) !== "#";
+}
+
 function linkAttrs(href = "") {
-  const external = /^https?:\/\//.test(href);
+  const safe = safeHref(href);
+  const external = /^https?:\/\//.test(safe);
   return `${external ? 'target="_blank" rel="noopener"' : ""}`;
 }
 
@@ -44,6 +65,16 @@ function cardImage(src, alt = "", type = "card", extraClass = "") {
   if (!src) return "";
   const classes = ["card-media", `card-media--${type}`, extraClass].filter(Boolean).join(" ");
   return `<img class="${classes}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" />`;
+}
+
+function installImageFallbacks(root = app) {
+  root.querySelectorAll("img").forEach((img) => {
+    img.addEventListener("error", () => {
+      img.classList.add("is-broken");
+      img.setAttribute("aria-hidden", "true");
+      img.removeAttribute("src");
+    }, { once: true });
+  });
 }
 
 function avatarFallback(label = "?") {
@@ -417,23 +448,33 @@ function chipGroup(name, values, active, allLabel) {
 
 function paginationControls(name, page, totalPages, totalItems) {
   if (totalPages <= 1) return "";
-  const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages = compactPageList(page, totalPages);
   return `
     <nav class="pagination" data-pagination="${esc(name)}" aria-label="${esc(name)} pagination">
       <span>${lang === "zh" ? `共 ${totalItems} 条` : `${totalItems} items`}</span>
       <div>
         <button type="button" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>${lang === "zh" ? "上一页" : "Prev"}</button>
-        ${pages.map((item) => `<button type="button" data-page="${item}" class="${item === page ? "active" : ""}">${item}</button>`).join("")}
+        ${pages.map((item) => item === "…" ? `<span class="pagination-ellipsis">…</span>` : `<button type="button" data-page="${item}" class="${item === page ? "active" : ""}">${item}</button>`).join("")}
         <button type="button" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>${lang === "zh" ? "下一页" : "Next"}</button>
       </div>
     </nav>
   `;
 }
 
+function compactPageList(page, totalPages) {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages = new Set([1, totalPages, page - 1, page, page + 1]);
+  if (page <= 3) [2, 3, 4].forEach((item) => pages.add(item));
+  if (page >= totalPages - 2) [totalPages - 3, totalPages - 2, totalPages - 1].forEach((item) => pages.add(item));
+  const ordered = [...pages].filter((item) => item >= 1 && item <= totalPages).sort((a, b) => a - b);
+  return ordered.flatMap((item, index) => index && item - ordered[index - 1] > 1 ? ["…", item] : [item]);
+}
+
 function hrefToRoute(href = "") {
-  if (/^(https?:|mailto:|#)/.test(href)) return href;
-  const clean = href.replace(/^\//, "");
-  return clean ? `${clean}/` : "";
+  const safe = safeHref(href);
+  if (/^(https?:|mailto:|#)/.test(safe)) return safe;
+  const clean = safe.replace(/^\//, "");
+  return clean ? `${clean}/` : "./";
 }
 
 function routeFromPath() {
@@ -441,7 +482,7 @@ function routeFromPath() {
   const last = path.split("/").filter(Boolean).pop();
   if (!last || last === "zzz" || last === "zeng-lab-recruitment") return "home";
   if (last === "admin") return "admin";
-  return ["team", "papers", "research", "resources", "news", "join"].includes(last) ? last : "home";
+  return ["team", "papers", "research", "resources", "news", "join", "contact"].includes(last) ? last : "home";
 }
 
 async function getServerData() {
@@ -456,9 +497,10 @@ async function getServerData() {
 
 async function saveServerData(data) {
   try {
+    const token = sessionStorage.getItem("zeng-admin-token") || "";
     const res = await fetch("/api/content", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
       body: JSON.stringify(data)
     });
     return res.ok;
@@ -470,6 +512,7 @@ async function saveServerData(data) {
 function mergeData(base, patch) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return base;
   for (const key of Object.keys(patch)) {
+    if (BLOCKED_MERGE_KEYS.has(key)) continue;
     if (patch[key] && typeof patch[key] === "object" && !Array.isArray(patch[key])) {
       base[key] = mergeData(base[key] || {}, patch[key]);
     } else {
@@ -499,14 +542,75 @@ function isHomeRepresentativePaper(paper) {
   return Boolean(paper.homeFeatured);
 }
 
+function homePaperCard(paper) {
+  const clickable = isClickableHref(paper.link);
+  const tag = clickable ? "a" : "article";
+  const attrs = clickable ? ` href="${safeHref(paper.link)}" ${linkAttrs(paper.link)}` : "";
+  return `
+    <${tag} class="home-paper-card ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      <span>${esc(paper.year)} · ${esc(paper.journal)}</span>
+      <strong>${esc(paper.title)}</strong>
+      <p>${esc(paper.authors)}</p>
+    </${tag}>
+  `;
+}
+
+function paperRow(paper) {
+  const clickable = isClickableHref(paper.link);
+  const tag = clickable ? "a" : "article";
+  const attrs = clickable ? ` href="${safeHref(paper.link)}" ${linkAttrs(paper.link)}` : "";
+  return `
+    <${tag} class="paper-row ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      <span>${esc(paper.year)}</span>
+      <div>
+        <strong>${esc(paper.title)}</strong>
+        <p>${esc(paper.authors)} · ${esc(paper.journal)}</p>
+        ${(paper.tags || []).length ? `<div class="tag-list">${paper.tags.map((tag) => `<em>${esc(tag)}</em>`).join("")}</div>` : ""}
+      </div>
+    </${tag}>
+  `;
+}
+
+function resourceCard(item) {
+  const clickable = isClickableHref(item.link);
+  const tag = clickable ? "a" : "article";
+  const attrs = clickable ? ` href="${safeHref(item.link)}" ${linkAttrs(item.link)}` : "";
+  const wideThumb = /GGWS|Fig1|floating/i.test(item.image || "");
+  return `
+    <${tag} class="resource-card ${wideThumb ? "resource-card--wide-thumb" : ""} ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      ${cardImage(item.image, item.title, "resource")}
+      <div>
+        <h3>${esc(item.title)}</h3>
+        <p>${esc(item.copy)}</p>
+      </div>
+    </${tag}>
+  `;
+}
+
+function newsItemCard(item) {
+  const clickable = isClickableHref(item.link);
+  const className = item.image ? "news-card" : "paper-row news-row";
+  const tag = clickable ? "a" : "article";
+  const attrs = clickable ? ` href="${hrefToRoute(item.link)}" ${linkAttrs(item.link)}` : "";
+  return `
+    <${tag} class="${className} ${clickable ? "is-clickable" : "is-static"}"${attrs}>
+      ${cardImage(item.image, item.title, "news") || `<span>${esc(item.date)}</span>`}
+      <div>
+        ${item.image ? `<span>${esc(item.date)}</span>` : ""}
+        <strong>${esc(item.title)}</strong>
+        <p>${esc(item.copy)}</p>
+      </div>
+    </${tag}>
+  `;
+}
+
 function renderShell(content) {
   const d = data();
   const f = d.footer || d.contact || {};
   app.innerHTML = `
     <header class="site-header">
       <a class="brand" href="${hrefToRoute("/")}">
-        <span class="brand-mark"><img src="assets/branding/lab-logo.png" alt="${esc(d.meta.labName)}" /></span>
-        <span><strong>${esc(d.meta.labName)}</strong><small>${esc(d.meta.labNameEn)}</small></span>
+        <span class="brand-school-lockup"><img src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en-crop.png" : "assets/branding/sustech-lockup-en-crop.png"}" alt="${lang === "zh" ? "南方科技大学" : "Southern University of Science and Technology"}" /></span>
       </a>
       <nav class="desktop-nav">
         ${d.nav.map((item) => `<a href="${hrefToRoute(item.href)}">${esc(item.label)}</a>`).join("")}
@@ -534,7 +638,7 @@ function renderShell(content) {
         </div>
         <div>
           <strong>${lang === "zh" ? "相关链接" : "Links"}</strong>
-          ${(f.links || []).map((l) => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a>`).join("")}
+          ${(f.links || []).map((l) => `<a href="${safeHref(l.href)}" ${linkAttrs(l.href)}>${esc(l.text)}</a>`).join("")}
         </div>
       </div>
       <div class="footer-bottom">
@@ -543,6 +647,7 @@ function renderShell(content) {
       </div>
     </footer>
   `;
+  installImageFallbacks(app);
 
   $("#language-toggle").addEventListener("click", () => {
     lang = lang === "zh" ? "en" : "zh";
@@ -563,8 +668,12 @@ function renderHome() {
       <div class="hero-overlay"></div>
       <div class="hero-inner main-container">
         <div class="hero-lab-name">
-          <div class="hero-school-lockup">
-            <img class="school-lockup-logo" src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en-crop.png" : "assets/branding/sustech-lockup-en-crop.png"}" alt="Southern University of Science and Technology" />
+          <div class="hero-lab-lockup">
+            <span class="hero-lab-mark"><img src="assets/branding/lab-logo.png" alt="${esc(d.meta.labName)}" /></span>
+            <span>
+              <strong>${esc(d.meta.labName)}</strong>
+              <small>${esc(d.meta.labNameEn)}</small>
+            </span>
           </div>
         </div>
         <p class="eyebrow">${esc(h.eyebrow)}</p>
@@ -579,10 +688,9 @@ function renderHome() {
     </section>
     <section class="split band">
       <div>
-        <p class="section-kicker">${esc(d.meta.labNameEn)}</p>
         <h2>${esc(h.featureTitle)}</h2>
       </div>
-      <p>${esc(h.featureCopy)}</p>
+      <p class="home-feature-copy">${esc(h.featureCopy)}</p>
     </section>
     <section class="media-section">
       ${cardImage(h.teamImage, "Team photo", "wide")}
@@ -598,17 +706,10 @@ function renderHome() {
     </section>
     <section class="featured-papers-section band">
       <div class="section-head">
-        <p class="section-kicker">${lang === "zh" ? "精选论文" : "Selected Papers"}</p>
-        <h2>${lang === "zh" ? "正刊 Nature 与 Science 代表作" : "Representative Papers in Nature and Science"}</h2>
+        <h2>${lang === "zh" ? "代表作" : "Representative Papers"}</h2>
       </div>
       <div class="home-paper-grid">
-        ${featuredPapers.map((paper) => `
-          <a class="home-paper-card" href="${paper.link ? esc(paper.link) : "#"}" ${linkAttrs(paper.link)}>
-            <span>${esc(paper.year)} · ${esc(paper.journal)}</span>
-            <strong>${esc(paper.title)}</strong>
-            <p>${esc(paper.authors)}</p>
-          </a>
-        `).join("")}
+        ${featuredPapers.map(homePaperCard).join("")}
       </div>
     </section>
   `);
@@ -662,7 +763,7 @@ function piCard(pi) {
         </div>
         <div class="pi-links">
           ${pi.email ? `<a href="mailto:${esc(pi.email)}">${esc(pi.email)}</a>` : ""}
-          ${(pi.links || []).map((l) => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a>`).join("")}
+          ${(pi.links || []).map((l) => `<a href="${safeHref(l.href)}" ${linkAttrs(l.href)}>${esc(l.text)}</a>`).join("")}
         </div>
       </div>
     </article>
@@ -672,7 +773,7 @@ function piCard(pi) {
 function renderTeam() {
   const t = data().team;
   const pi = t.pi || t.sections?.[0]?.members?.[0] || {};
-  const sections = (t.sections || []).filter((section, index) => index !== 0);
+  const sections = normalizeCurrentTeamSections(t.sections || [], lang);
   const currentContent = `
     <section class="content-section">
       <div class="section-head"><h2>${lang === "zh" ? "负责人" : "Principal Investigator"}</h2></div>
@@ -700,8 +801,8 @@ function renderTeam() {
     ${pageHero(t.title, t.intro)}
     <section class="content-section compact-section">
       <div class="tab-strip" data-filter="team-tab">
-        <button type="button" data-value="current" class="${teamTab === "current" ? "active" : ""}">Current</button>
-        <button type="button" data-value="alumni" class="${teamTab === "alumni" ? "active" : ""}">Alumni</button>
+        <button type="button" data-value="current" class="${teamTab === "current" ? "active" : ""}">${lang === "zh" ? "当前成员" : "Current"}</button>
+        <button type="button" data-value="alumni" class="${teamTab === "alumni" ? "active" : ""}">${lang === "zh" ? "已毕业成员" : "Alumni"}</button>
       </div>
     </section>
     ${teamTab === "current" ? currentContent : alumniContent}
@@ -747,16 +848,7 @@ function renderPapers() {
         </div>
       </div>
       <div class="paper-list">
-        ${pageItems.map((paper) => `
-          <a class="paper-row" href="${paper.link ? esc(paper.link) : "#"}" ${linkAttrs(paper.link)}>
-            <span>${esc(paper.year)}</span>
-            <div>
-              <strong>${esc(paper.title)}</strong>
-              <p>${esc(paper.authors)} · ${esc(paper.journal)}</p>
-              ${(paper.tags || []).length ? `<div class="tag-list">${paper.tags.map((tag) => `<em>${esc(tag)}</em>`).join("")}</div>` : ""}
-            </div>
-          </a>
-        `).join("")}
+        ${pageItems.map(paperRow).join("")}
       </div>
       ${paginationControls("papers", paperPage, totalPages, filtered.length)}
     </section>
@@ -807,15 +899,7 @@ function renderResearch() {
         <p>${esc(d.resources?.intro || "")}</p>
       </div>
       <div class="resource-grid merged">
-        ${resources.map((item) => `
-          <a class="resource-card" href="${esc(item.link || "#")}" ${linkAttrs(item.link)}>
-            ${cardImage(item.image, item.title, "resource")}
-            <div>
-              <h3>${esc(item.title)}</h3>
-              <p>${esc(item.copy)}</p>
-            </div>
-          </a>
-        `).join("")}
+        ${resources.map(resourceCard).join("")}
       </div>
     </section>
   `);
@@ -839,16 +923,7 @@ function renderNews() {
         </div>
       </div>
       <div class="paper-list news-list">
-        ${pageItems.map((item) => `
-        <a class="${item.image ? "news-card" : "paper-row news-row"}" href="${hrefToRoute(item.link || "#")}" ${linkAttrs(item.link)}>
-          ${cardImage(item.image, item.title, "news") || `<span>${esc(item.date)}</span>`}
-          <div>
-            ${item.image ? `<span>${esc(item.date)}</span>` : ""}
-            <strong>${esc(item.title)}</strong>
-            <p>${esc(item.copy)}</p>
-          </div>
-        </a>
-      `).join("")}
+        ${pageItems.map(newsItemCard).join("")}
       </div>
       ${paginationControls("news", newsPage, totalPages, filtered.length)}
     </section>
@@ -874,15 +949,7 @@ function renderResources() {
     ${pageHero(r.title, r.intro)}
     <section class="content-section">
       <div class="resource-grid">
-        ${r.items.map((item) => `
-          <a class="resource-card" href="${esc(item.link || "#")}" ${linkAttrs(item.link)}>
-            ${cardImage(item.image, item.title, "resource")}
-            <div>
-              <h3>${esc(item.title)}</h3>
-              <p>${esc(item.copy)}</p>
-            </div>
-          </a>
-        `).join("")}
+        ${r.items.map(resourceCard).join("")}
       </div>
     </section>
   `);
@@ -902,7 +969,7 @@ function renderJoin() {
         <div class="card-grid">${(j.openings || []).map((x) => `<article><h3>${esc(x.title)}</h3><p>${esc(x.copy)}</p></article>`).join("")}</div>
         <h2 class="compact-title">${lang === "zh" ? "申请材料" : "Application Materials"}</h2>
         <ul class="material-list">${(j.materials || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-        <a class="button primary wide" href="${esc(j.contact.href)}">${esc(j.contact.text)}</a>
+        <a class="button primary wide" href="${safeHref(j.contact.href)}">${esc(j.contact.text)}</a>
       </div>
     </section>
   `);
@@ -913,8 +980,8 @@ function renderContact() {
   renderShell(`
     ${pageHero(c.title, c.intro)}
     <section class="contact-section">
-      <a class="button primary wide" href="${esc(c.email.href)}">${esc(c.email.text)}</a>
-      ${c.links.map((l) => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a>`).join("")}
+      <a class="button primary wide" href="${safeHref(c.email.href)}">${esc(c.email.text)}</a>
+      ${c.links.map((l) => `<a href="${safeHref(l.href)}" ${linkAttrs(l.href)}>${esc(l.text)}</a>`).join("")}
     </section>
   `);
 }
@@ -924,14 +991,22 @@ function pathSet(obj, path, value) {
   let cursor = obj;
   while (parts.length > 1) {
     const key = parts.shift();
+    if (BLOCKED_MERGE_KEYS.has(key)) return;
     cursor[key] = cursor[key] || {};
     cursor = cursor[key];
   }
+  if (BLOCKED_MERGE_KEYS.has(parts[0])) return;
   cursor[parts[0]] = value;
 }
 
 function pathGet(obj, path) {
-  return path.split(".").reduce((cursor, key) => cursor?.[key], obj);
+  return path.split(".").reduce((cursor, key) => BLOCKED_MERGE_KEYS.has(key) ? undefined : cursor?.[key], obj);
+}
+
+function syncAdminFields() {
+  document.querySelectorAll("[data-field]").forEach((field) => {
+    pathSet(siteData, field.dataset.field.replace(/^root\./, ""), field.value);
+  });
 }
 
 function isImageField(path = "") {
@@ -978,13 +1053,16 @@ function renderEditor(value, path) {
 }
 
 function renderAdmin() {
-  const ok = sessionStorage.getItem("zeng-admin-ok") === "1" || prompt("请输入管理密码") === PASSWORD;
+  const existingToken = sessionStorage.getItem("zeng-admin-token");
+  const token = existingToken || prompt("请输入管理令牌。请将本地服务环境变量 ADMIN_TOKEN 设置为相同值。");
+  const ok = Boolean(token);
   if (!ok) {
-    alert("密码错误");
+    alert("缺少管理令牌");
     location.href = hrefToRoute("/");
     return;
   }
   sessionStorage.setItem("zeng-admin-ok", "1");
+  sessionStorage.setItem("zeng-admin-token", token);
   app.innerHTML = `
     <main class="admin-page">
       <section class="admin-top">
@@ -1004,11 +1082,17 @@ function renderAdmin() {
       </section>
     </main>
   `;
+  installImageFallbacks(app);
 
   document.querySelectorAll("[data-upload]").forEach((input) => {
     input.addEventListener("change", () => {
       const file = input.files?.[0];
       if (!file) return;
+      if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+        alert("请选择 2MB 以内的图片文件。");
+        input.value = "";
+        return;
+      }
       const reader = new FileReader();
       reader.addEventListener("load", () => {
         const field = document.querySelector(`[data-field="${CSS.escape(input.dataset.upload)}"]`);
@@ -1032,7 +1116,9 @@ function renderAdmin() {
   document.querySelectorAll("[data-add]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
+      syncAdminFields();
       const arr = pathGet(siteData, button.dataset.add.replace(/^root\./, ""));
+      if (!Array.isArray(arr)) return;
       const sample = arr[0] ? structuredClone(arr[0]) : { title: "新卡片", copy: "请编辑内容", link: "" };
       arr.push(sample);
       renderAdmin();
@@ -1042,14 +1128,16 @@ function renderAdmin() {
   document.querySelectorAll("[data-delete]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
+      syncAdminFields();
       const arr = pathGet(siteData, button.dataset.delete.replace(/^root\./, ""));
+      if (!Array.isArray(arr)) return;
       arr.splice(Number(button.dataset.index), 1);
       renderAdmin();
     });
   });
 
   $("#save-admin").addEventListener("click", async () => {
-    document.querySelectorAll("[data-field]").forEach((field) => pathSet(siteData, field.dataset.field.replace(/^root\./, ""), field.value));
+    syncAdminFields();
     const saved = await saveServerData(siteData);
     localStorage.setItem(STORAGE_KEY, saved ? "" : JSON.stringify(siteData));
     alert(saved ? "已保存到 content.json。" : "已保存到当前浏览器。静态部署如需全站同步，需要后端存储。");
@@ -1057,7 +1145,10 @@ function renderAdmin() {
 
   $("#reset-admin").addEventListener("click", async () => {
     if (!confirm("确定恢复默认内容？")) return;
-    siteData = structuredClone(window.DEFAULT_SITE_DATA);
+    siteData = {
+      zh: structuredClone(window.DEFAULT_SITE_DATA.zh),
+      en: structuredClone(window.DEFAULT_SITE_DATA.en)
+    };
     localStorage.removeItem(STORAGE_KEY);
     await saveServerData({});
     renderAdmin();
@@ -1067,22 +1158,65 @@ function renderAdmin() {
 function render() {
   const route = routeFromPath();
   if (route === "admin") return renderAdmin();
-  const map = { home: renderHome, team: renderTeam, papers: renderPapers, research: renderResearch, resources: renderResources, news: renderNews, join: renderJoin };
+  const map = { home: renderHome, team: renderTeam, papers: renderPapers, research: renderResearch, resources: renderResources, news: renderNews, join: renderJoin, contact: renderContact };
   map[route]();
 }
 
 async function init() {
   if (Array.isArray(window.PAPER_LIST) && window.PAPER_LIST.length) {
-    siteData.zh.papers.items = window.PAPER_LIST;
-    siteData.en.papers.items = window.PAPER_LIST;
+    siteData.zh.papers.items = structuredClone(window.PAPER_LIST);
+    siteData.en.papers.items = structuredClone(window.PAPER_LIST);
   }
   const serverData = await getServerData();
   const localData = localStorage.getItem(STORAGE_KEY);
   mergeData(siteData, serverData);
-  if (localData) mergeData(siteData, JSON.parse(localData));
+  if (localData) {
+    try {
+      mergeData(siteData, JSON.parse(localData));
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
   normalizeTeamData();
   applyTeamRoleOrder();
   render();
+}
+
+function normalizeCurrentTeamSections(rawSections = [], langKey = "zh") {
+  const source = rawSections.filter((section, index) => index !== 0);
+  const allMembers = source.flatMap((section) => (section.members || []).map((member) => ({
+    ...member,
+    _sectionTitle: section.title
+  })));
+  const isBinbin = (member) => /曾斌斌|Binbin Zeng/.test(`${member.name || ""} ${member.cn || ""}`);
+  const titleMap = langKey === "zh"
+    ? ["大总管", "教师", "博士后", "在读博士", "在读硕士", "在读本科生", "科研教学助理", "访问学者"]
+    : ["Lab Manager", "Faculty", "Postdoctoral Researcher", "PhD Student", "Master Student", "Undergraduate Student", "Research and Teaching Assistant", "Visiting Scholar"];
+  const roleTests = [
+    isBinbin,
+    (member) => /教师|Faculty/.test(`${member.role || ""} ${member._sectionTitle || ""}`),
+    (member) => /博士后|Postdoctoral/.test(`${member.role || ""} ${member._sectionTitle || ""}`) && !isBinbin(member),
+    (member) => /在读博士|PhD Student/.test(`${member.role || ""} ${member._sectionTitle || ""}`),
+    (member) => /在读硕士|Master Student/.test(`${member.role || ""} ${member._sectionTitle || ""}`),
+    (member) => /在读本科生|Undergraduate Student/.test(`${member.role || ""} ${member._sectionTitle || ""}`),
+    (member) => /科研教学助理|Research and Teaching Assistant/.test(`${member.role || ""} ${member._sectionTitle || ""}`) && !isBinbin(member),
+    (member) => /访问学者|Visiting Scholar/.test(`${member.role || ""} ${member._sectionTitle || ""}`)
+  ];
+  const used = new Set();
+  const sections = titleMap.map((title, index) => {
+    const members = allMembers.filter((member, memberIndex) => {
+      if (used.has(memberIndex) || !roleTests[index](member)) return false;
+      used.add(memberIndex);
+      return true;
+    }).map(({ _sectionTitle, ...member }) => member);
+    return { title, members };
+  });
+  const remaining = allMembers.filter((_, index) => !used.has(index)).map(({ _sectionTitle, ...member }) => member);
+  if (remaining.length) {
+    const visitingIndex = sections.length - 1;
+    sections[visitingIndex].members = [...remaining, ...sections[visitingIndex].members];
+  }
+  return sections;
 }
 
 init();

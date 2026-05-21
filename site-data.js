@@ -2,7 +2,7 @@ window.DEFAULT_SITE_DATA = {
   zh: {
     meta: {
       labName: "地球系统与全球变化课题组",
-      labNameEn: "Earth System& Globle Change Lab",
+      labNameEn: "Earth System & Global Change Lab",
       school: "南方科技大学 环境科学与工程学院",
       shortIntro: "以地球系统科学为根基，结合遥感观测、地球系统模型、人工智能与高性能计算，理解全球变化并服务气候韧性未来。"
     },
@@ -152,8 +152,8 @@ window.DEFAULT_SITE_DATA = {
       items: [
         { title: "Global evapotranspiration (WB-MTE)", copy: "通过水量平衡模型与机器学习算法耦合构建的全球月尺度蒸散发数据集，空间分辨率 0.5°，时间范围 1982-2009。", image: "assets/resources/evaporation.png", link: "https://1drv.ms/u/s!AiRN_e2BaFsYhG_qt8e5R44b0dFy?e=j4knQR" },
         { title: "Multi-greenhouse-gas assessments", copy: "多温室气体评估相关代码资源，面向湿地恢复与主要温室气体排放研究。", image: "assets/resources/wetland_emissions.png", link: "https://github.com/XiaoBai0417/Multi-greenhouse-gas-assessments" },
-        { title: "GGWS-PCNN 全球风速数据", copy: "基于部分卷积神经网络构建的全球网格月尺度风速数据集，融合 HadISD 和 34 个气候模式信息，覆盖 1973-2021。", image: "assets/resources/Zhoulh-GGWS.png", link: "https://github.com/HeverLaw/PCNN-for-wind-reconstruction" },
-        { title: "Floating solar power", copy: "全球水库浮式光伏能源生产与节水潜力评估的代码资源。", image: "assets/resources/Fig1.png", link: "https://github.com/YubinJin98/Floating-solar-power" }
+        { title: "GGWS-PCNN 全球风速数据", copy: "基于部分卷积神经网络构建的全球网格月尺度风速数据集，融合 HadISD 和 34 个气候模式信息，覆盖 1973-2021。", image: "assets/resources/Zhoulh-GGWS-card.png", link: "https://github.com/HeverLaw/PCNN-for-wind-reconstruction" },
+        { title: "Floating solar power", copy: "全球水库浮式光伏能源生产与节水潜力评估的代码资源。", image: "assets/resources/Fig1-card.png", link: "https://github.com/YubinJin98/Floating-solar-power" }
       ]
     },
     join: {
@@ -196,7 +196,7 @@ window.DEFAULT_SITE_DATA = {
 
 window.DEFAULT_SITE_DATA.en = {
   meta: {
-    labName: "Earth System& Globle Change Lab",
+    labName: "Earth System & Global Change Lab",
     labNameEn: "地球系统与全球变化课题组",
     school: "School of Environmental Science and Engineering, SUSTech",
     shortIntro: "Grounded in Earth system science, we combine remote sensing, models, AI, and high-performance computing to understand global change and support a climate-resilient future."
@@ -269,8 +269,8 @@ window.DEFAULT_SITE_DATA.en = {
     items: [
       { title: "Global evapotranspiration (WB-MTE)", copy: "A global monthly evapotranspiration dataset at 0.5 degree resolution from 1982 to 2009, built by coupling a water balance model with machine learning.", image: "assets/resources/evaporation.png", link: "https://1drv.ms/u/s!AiRN_e2BaFsYhG_qt8e5R44b0dFy?e=j4knQR" },
       { title: "Multi-greenhouse-gas assessments", copy: "Code resources for multi-greenhouse-gas assessments in wetland restoration and greenhouse gas mitigation studies.", image: "assets/resources/wetland_emissions.png", link: "https://github.com/XiaoBai0417/Multi-greenhouse-gas-assessments" },
-      { title: "GGWS-PCNN global wind speed", copy: "A global gridded monthly wind speed dataset using partial convolutional neural networks, HadISD observations, and 34 climate models for 1973-2021.", image: "assets/resources/Zhoulh-GGWS.png", link: "https://github.com/HeverLaw/PCNN-for-wind-reconstruction" },
-      { title: "Floating solar power", copy: "Code resources for assessing energy production and water savings from floating solar photovoltaics on global reservoirs.", image: "assets/resources/Fig1.png", link: "https://github.com/YubinJin98/Floating-solar-power" }
+      { title: "GGWS-PCNN global wind speed", copy: "A global gridded monthly wind speed dataset using partial convolutional neural networks, HadISD observations, and 34 climate models for 1973-2021.", image: "assets/resources/Zhoulh-GGWS-card.png", link: "https://github.com/HeverLaw/PCNN-for-wind-reconstruction" },
+      { title: "Floating solar power", copy: "Code resources for assessing energy production and water savings from floating solar photovoltaics on global reservoirs.", image: "assets/resources/Fig1-card.png", link: "https://github.com/YubinJin98/Floating-solar-power" }
     ]
   },
   join: {
@@ -299,7 +299,7 @@ window.DEFAULT_SITE_DATA.en = {
   },
   contact: {
     title: "Contact",
-    intro: "Earth System& Globle Change Lab is based at the School of Environmental Science and Engineering, SUSTech.",
+    intro: "Earth System & Global Change Lab is based at the School of Environmental Science and Engineering, SUSTech.",
     email: { text: "Research Assistant: zengbb@mail.sustech.edu.cn", href: "mailto:zengbb@mail.sustech.edu.cn" },
     links: window.DEFAULT_SITE_DATA.zh.contact.links
   }
@@ -312,14 +312,15 @@ Object.assign(window.DEFAULT_SITE_DATA.zh, {
     { label: "论文", href: "/papers" },
     { label: "研究", href: "/research" },
     { label: "新闻", href: "/news" },
-    { label: "加入我们", href: "/join" }
+    { label: "加入我们", href: "/join" },
+    { label: "联系", href: "/contact" }
   ],
   footer: {
     lab: "地球系统与全球变化课题组",
     school: "南方科技大学 环境科学与工程学院",
     address: "广东省深圳市南山区学苑大道 1088 号南方科技大学",
     email: "zengzz@sustech.edu.cn",
-    assistant: "团队科研助理：zengbb@mail.sustech.edu.cn",
+    assistant: "团队大总管 曾斌斌：zengbb@mail.sustech.edu.cn",
     funding: "Funding: Start-up Fund by SUSTech · General Project by NSFC",
     links: [
       { text: "Google Scholar", href: "https://scholar.google.com/citations?user=GsM4YKQAAAAJ&hl=zh-CN&oi=ao" },
@@ -425,7 +426,8 @@ Object.assign(window.DEFAULT_SITE_DATA.en, {
     { label: "Papers", href: "/papers" },
     { label: "Research", href: "/research" },
     { label: "News", href: "/news" },
-    { label: "Join Us", href: "/join" }
+    { label: "Join Us", href: "/join" },
+    { label: "Contact", href: "/contact" }
   ],
   footer: {
     lab: "Earth System & Global Change Lab",

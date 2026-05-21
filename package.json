@@ -4,6 +4,9 @@
   "private": true,
   "description": "Recruitment website for Zhenzhong Zeng Lab, AI for Climate.",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check script.js && node --check server.js",
+    "test": "npm run check && node .tools/unit-tests.js && node .tools/smoke-tests.js",
+    "test:admin-crud": "npm run check && node .tools/admin-crud-e2e.js"
   }
 }
