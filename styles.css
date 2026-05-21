@@ -1855,7 +1855,8 @@ footer a {
 
 .inline-edit-button,
 .inline-add-button,
-.inline-delete-button {
+.inline-delete-button,
+.inline-move-actions button {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -1887,6 +1888,19 @@ footer a {
   color: white;
 }
 
+.admin-section-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.content-section > .inline-add-button,
+.featured-papers-section > .inline-add-button {
+  display: inline-grid;
+  margin-left: auto;
+  margin-right: 0;
+}
+
 .section-head .inline-add-button {
   margin: 0;
 }
@@ -1897,6 +1911,26 @@ footer a {
   color: #b42318;
 }
 
+.inline-move-actions {
+  position: absolute;
+  top: 74px;
+  right: 10px;
+  z-index: 8;
+  display: flex;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+}
+
+.inline-move-actions button {
+  position: relative;
+  top: auto;
+  right: auto;
+  min-width: 42px;
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 0.68rem;
+}
+
 .editable-media > .inline-edit-button {
   position: absolute;
   top: 10px;
@@ -1905,7 +1939,13 @@ footer a {
 }
 
 .inline-edit-button:hover,
-.inline-edit-button:focus-visible {
+.inline-edit-button:focus-visible,
+.inline-add-button:hover,
+.inline-add-button:focus-visible,
+.inline-delete-button:hover,
+.inline-delete-button:focus-visible,
+.inline-move-actions button:hover,
+.inline-move-actions button:focus-visible {
   border-color: var(--leaf-dark);
   background: var(--white);
   outline: 0;
@@ -2004,7 +2044,8 @@ footer a {
 }
 
 .inline-edit-field input,
-.inline-edit-field textarea {
+.inline-edit-field textarea,
+.inline-edit-field select {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--line);

@@ -359,7 +359,7 @@ Object.assign(window.DEFAULT_SITE_DATA.zh, {
       {
         title: "博士后校友",
         members: [
-          { name: "Dashan Wang", cn: "王大山", role: "Research Assistant Professor", started: "Sun Yat-sen University", image: "assets/team/dashan_touxiang.jpg" },
+          { name: "Dashan Wang", cn: "王大山", role: "已出站博士后", started: "Sun Yat-sen University", image: "assets/team/dashan_touxiang.jpg" },
           { name: "Feng Yang", cn: "杨锋", role: "Postdoc", started: "Northwest A&F University" },
           { name: "Yu Feng", cn: "冯宇", role: "Postdoc", started: "Laboratoire des Sciences du Climat et de l'Environnement" },
           { name: "He Chen", cn: "陈赫", role: "Postdoc" },
@@ -794,7 +794,7 @@ window.DEFAULT_SITE_DATA.zh.team = {
         {
           "name": "王大山",
           "cn": "Dashan Wang",
-          "role": "已离职研究助理教授、出站博士后",
+          "role": "已出站博士后",
           "destination": "中山大学 副教授",
           "image": "assets/team/dashan_touxiang.jpg"
         },
@@ -1280,7 +1280,7 @@ window.DEFAULT_SITE_DATA.en.team = {
         {
           "name": "Dashan Wang",
           "cn": "王大山",
-          "role": "Former Research Assistant Professor / Postdoctoral Fellow",
+          "role": "Former Postdoctoral Fellow",
           "destination": "中山大学 副教授",
           "image": "assets/team/dashan_touxiang.jpg"
         },
