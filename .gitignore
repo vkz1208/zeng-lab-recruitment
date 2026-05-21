@@ -1,5 +1,8 @@
 .tools/
 .vercel/
 node_modules/
+dist/
 npm-debug.log*
 *.xlsx
+
+.vercel
