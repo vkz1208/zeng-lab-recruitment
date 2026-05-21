@@ -541,8 +541,14 @@ function data() {
   return siteData[lang] || siteData.zh;
 }
 
+function isEnabledFlag(value) {
+  if (value === true || value === 1) return true;
+  if (typeof value !== "string") return false;
+  return ["true", "yes", "y", "是", "√", "1"].includes(value.trim().toLowerCase());
+}
+
 function isHomeRepresentativePaper(paper) {
-  return Boolean(paper.homeFeatured);
+  return isEnabledFlag(paper.homeFeatured);
 }
 
 function homePaperCard(paper) {
@@ -827,7 +833,7 @@ function renderPapers() {
   const years = [...new Set(items.map((paper) => yearOf(paper.year)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
   const tags = [...new Set(items.flatMap((paper) => paper.tags || []))].sort();
   const filtered = items.filter((paper) => {
-    const matchesTab = paperTab === "all" || paper.featured;
+    const matchesTab = paperTab === "all" || isEnabledFlag(paper.featured);
     const matchesYear = paperYear === "all" || yearOf(paper.year) === paperYear;
     const matchesTag = paperTag === "all" || (paper.tags || []).includes(paperTag);
     return matchesTab && matchesYear && matchesTag;
@@ -1010,7 +1016,8 @@ function pathGet(obj, path) {
 
 function syncAdminFields() {
   document.querySelectorAll("[data-field]").forEach((field) => {
-    pathSet(siteData, field.dataset.field.replace(/^root\./, ""), field.value);
+    const value = field.type === "checkbox" ? field.checked : field.value;
+    pathSet(siteData, field.dataset.field.replace(/^root\./, ""), value);
   });
 }
 
@@ -1044,6 +1051,14 @@ function renderEditor(value, path) {
   }
   if (value && typeof value === "object") {
     return `<details open class="admin-group"><summary>${esc(path)}</summary>${Object.keys(value).map((key) => renderEditor(value[key], `${path}.${key}`)).join("")}</details>`;
+  }
+  if (typeof value === "boolean") {
+    return `
+      <label class="admin-field admin-field--checkbox">
+        <span>${esc(path)}</span>
+        <input type="checkbox" data-field="${esc(path)}" ${value ? "checked" : ""} />
+      </label>
+    `;
   }
   const stringValue = value == null ? "" : String(value);
   const isLong = stringValue.length > 70;

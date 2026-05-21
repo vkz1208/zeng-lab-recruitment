@@ -1605,6 +1605,18 @@ footer a {
   font: inherit;
 }
 
+.admin-field--checkbox {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.admin-field--checkbox input {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  accent-color: var(--leaf-dark);
+}
+
 .admin-field textarea {
   min-height: 92px;
 }
