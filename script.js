@@ -16,6 +16,9 @@ let newsYear = "all";
 let teamTab = "current";
 let paperPage = 1;
 let newsPage = 1;
+let adminMode = false;
+let adminPreviewRoute = "team";
+let adminPanelOpen = false;
 
 function $(selector, root = document) {
   return root.querySelector(selector);
@@ -607,6 +610,7 @@ function newsItemCard(item) {
 function renderShell(content) {
   const d = data();
   const f = d.footer || d.contact || {};
+  document.body.classList.toggle("admin-preview-mode", adminMode);
   app.innerHTML = `
     <header class="site-header">
       <a class="brand" href="${hrefToRoute("/")}">
@@ -648,6 +652,7 @@ function renderShell(content) {
     </footer>
   `;
   installImageFallbacks(app);
+  if (adminMode) injectAdminChrome();
 
   $("#language-toggle").addEventListener("click", () => {
     lang = lang === "zh" ? "en" : "zh";
@@ -1052,37 +1057,90 @@ function renderEditor(value, path) {
   `;
 }
 
-function renderAdmin() {
-  const existingToken = sessionStorage.getItem("zeng-admin-token");
-  const token = existingToken || prompt("请输入管理令牌。请将本地服务环境变量 ADMIN_TOKEN 设置为相同值。");
-  const ok = Boolean(token);
-  if (!ok) {
-    alert("缺少管理令牌");
-    location.href = hrefToRoute("/");
-    return;
-  }
-  sessionStorage.setItem("zeng-admin-ok", "1");
-  sessionStorage.setItem("zeng-admin-token", token);
-  app.innerHTML = `
-    <main class="admin-page">
-      <section class="admin-top">
+function adminRouteOptions() {
+  const labels = {
+    home: lang === "zh" ? "首页" : "Home",
+    team: lang === "zh" ? "团队" : "Team",
+    papers: lang === "zh" ? "论文" : "Papers",
+    research: lang === "zh" ? "研究" : "Research",
+    resources: lang === "zh" ? "资源" : "Resources",
+    news: lang === "zh" ? "新闻" : "News",
+    join: lang === "zh" ? "加入我们" : "Join",
+    contact: lang === "zh" ? "联系" : "Contact"
+  };
+  return ["home", "team", "papers", "research", "resources", "news", "join", "contact"]
+    .map((route) => `<option value="${route}" ${adminPreviewRoute === route ? "selected" : ""}>${esc(labels[route])}</option>`)
+    .join("");
+}
+
+function routeFromAdminHref(href = "") {
+  const clean = href.replace(/^\.?\//, "").replace(/\/+$/, "");
+  if (!clean || clean === "#") return "home";
+  return ["team", "papers", "research", "resources", "news", "join", "contact"].includes(clean) ? clean : "";
+}
+
+function injectAdminChrome() {
+  app.insertAdjacentHTML("beforeend", `
+    <div class="admin-preview-toolbar" role="region" aria-label="Admin preview controls">
+      <strong>${lang === "zh" ? "所见即所得编辑" : "Visual Editor"}</strong>
+      <label>
+        <span>${lang === "zh" ? "预览页面" : "Preview"}</span>
+        <select id="admin-page-select">${adminRouteOptions()}</select>
+      </label>
+      <button id="admin-panel-toggle" type="button">${adminPanelOpen ? (lang === "zh" ? "收起编辑" : "Hide editor") : (lang === "zh" ? "编辑内容" : "Edit content")}</button>
+      <button id="save-admin" class="save" type="button">${lang === "zh" ? "保存生效" : "Save"}</button>
+      <button id="reset-admin" type="button">${lang === "zh" ? "恢复默认" : "Reset"}</button>
+      <a class="button secondary" href="${hrefToRoute("/")}">${lang === "zh" ? "退出后台" : "Exit"}</a>
+    </div>
+    <aside class="admin-dock ${adminPanelOpen ? "open" : ""}" id="admin-dock" aria-label="Admin editor">
+      <div class="admin-dock-head">
         <div>
           <p class="eyebrow">Admin</p>
-          <h1>网站编辑模式</h1>
-          <p>可编辑文字、图片路径、链接，并对团队、论文、新闻、研究方向等卡片进行添加或删除。保存后本地服务器会写入 content.json；静态部署会保存到当前浏览器。</p>
+          <h2>${lang === "zh" ? "内容编辑" : "Content Editor"}</h2>
         </div>
-        <a class="button secondary" href="${hrefToRoute("/")}">返回网站</a>
-      </section>
-      <section class="admin-panel">
-        <div class="admin-actions sticky">
-          <button id="save-admin" class="save" type="button">保存生效</button>
-          <button id="reset-admin" type="button">恢复默认</button>
-        </div>
+        <button id="admin-dock-close" type="button" aria-label="Close editor">×</button>
+      </div>
+      <p class="admin-dock-note">${lang === "zh" ? "左侧页面使用正式网页同一套布局渲染。修改字段后保存即可生效；新增、删除卡片会保留当前未保存输入。" : "The page behind this panel uses the same renderer as the public site. Save after editing fields."}</p>
+      <section class="admin-panel visual-editor-panel">
         ${renderEditor(siteData, "root")}
       </section>
-    </main>
-  `;
-  installImageFallbacks(app);
+    </aside>
+  `);
+  installImageFallbacks($("#admin-dock"));
+  installAdminHandlers();
+}
+
+function installAdminHandlers() {
+  $("#admin-page-select")?.addEventListener("change", (event) => {
+    syncAdminFields();
+    adminPreviewRoute = event.target.value;
+    sessionStorage.setItem("zeng-admin-preview-route", adminPreviewRoute);
+    renderAdminPreview();
+  });
+
+  $("#admin-panel-toggle")?.addEventListener("click", () => {
+    adminPanelOpen = !adminPanelOpen;
+    $("#admin-dock")?.classList.toggle("open", adminPanelOpen);
+    $("#admin-panel-toggle").textContent = adminPanelOpen ? (lang === "zh" ? "收起编辑" : "Hide editor") : (lang === "zh" ? "编辑内容" : "Edit content");
+  });
+
+  $("#admin-dock-close")?.addEventListener("click", () => {
+    adminPanelOpen = false;
+    $("#admin-dock")?.classList.remove("open");
+    $("#admin-panel-toggle").textContent = lang === "zh" ? "编辑内容" : "Edit content";
+  });
+
+  document.querySelectorAll(".site-header a, .mobile-drawer a").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      const route = routeFromAdminHref(link.getAttribute("href") || "");
+      if (!route) return;
+      event.preventDefault();
+      syncAdminFields();
+      adminPreviewRoute = route;
+      sessionStorage.setItem("zeng-admin-preview-route", adminPreviewRoute);
+      renderAdminPreview();
+    });
+  });
 
   document.querySelectorAll("[data-upload]").forEach((input) => {
     input.addEventListener("change", () => {
@@ -1110,6 +1168,7 @@ function renderAdmin() {
     field.addEventListener("input", () => {
       const preview = document.querySelector(`[data-preview="${CSS.escape(field.dataset.field)}"]`);
       if (preview) preview.innerHTML = cardImage(field.value, field.dataset.field, imageTypeFromPath(field.dataset.field));
+      installImageFallbacks(preview);
     });
   });
 
@@ -1121,7 +1180,7 @@ function renderAdmin() {
       if (!Array.isArray(arr)) return;
       const sample = arr[0] ? structuredClone(arr[0]) : { title: "新卡片", copy: "请编辑内容", link: "" };
       arr.push(sample);
-      renderAdmin();
+      renderAdminPreview();
     });
   });
 
@@ -1132,18 +1191,18 @@ function renderAdmin() {
       const arr = pathGet(siteData, button.dataset.delete.replace(/^root\./, ""));
       if (!Array.isArray(arr)) return;
       arr.splice(Number(button.dataset.index), 1);
-      renderAdmin();
+      renderAdminPreview();
     });
   });
 
-  $("#save-admin").addEventListener("click", async () => {
+  $("#save-admin")?.addEventListener("click", async () => {
     syncAdminFields();
     const saved = await saveServerData(siteData);
     localStorage.setItem(STORAGE_KEY, saved ? "" : JSON.stringify(siteData));
     alert(saved ? "已保存到 content.json。" : "已保存到当前浏览器。静态部署如需全站同步，需要后端存储。");
   });
 
-  $("#reset-admin").addEventListener("click", async () => {
+  $("#reset-admin")?.addEventListener("click", async () => {
     if (!confirm("确定恢复默认内容？")) return;
     siteData = {
       zh: structuredClone(window.DEFAULT_SITE_DATA.zh),
@@ -1151,13 +1210,45 @@ function renderAdmin() {
     };
     localStorage.removeItem(STORAGE_KEY);
     await saveServerData({});
-    renderAdmin();
+    renderAdminPreview();
   });
+}
+
+function renderAdminPreview() {
+  const map = {
+    home: renderHome,
+    team: renderTeam,
+    papers: renderPapers,
+    research: renderResearch,
+    resources: renderResources,
+    news: renderNews,
+    join: renderJoin,
+    contact: renderContact
+  };
+  (map[adminPreviewRoute] || renderTeam)();
+}
+
+function renderAdmin() {
+  const existingToken = sessionStorage.getItem("zeng-admin-token");
+  const token = existingToken || prompt("请输入管理令牌。请将本地服务环境变量 ADMIN_TOKEN 设置为相同值。");
+  const ok = Boolean(token);
+  if (!ok) {
+    alert("缺少管理令牌");
+    location.href = hrefToRoute("/");
+    return;
+  }
+  sessionStorage.setItem("zeng-admin-ok", "1");
+  sessionStorage.setItem("zeng-admin-token", token);
+  adminMode = true;
+  adminPreviewRoute = sessionStorage.getItem("zeng-admin-preview-route") || adminPreviewRoute;
+  renderAdminPreview();
 }
 
 function render() {
   const route = routeFromPath();
   if (route === "admin") return renderAdmin();
+  adminMode = false;
+  document.body.classList.remove("admin-preview-mode");
   const map = { home: renderHome, team: renderTeam, papers: renderPapers, research: renderResearch, resources: renderResources, news: renderNews, join: renderJoin, contact: renderContact };
   map[route]();
 }
