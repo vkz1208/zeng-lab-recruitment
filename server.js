@@ -2,13 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { validateContentData } = require("./content-schema");
+const { readContentData, writeContentData } = require("./content-store");
 
 const root = __dirname;
 const port = process.env.PORT || 3000;
-const contentFile = path.join(root, "content.json");
 const adminToken = process.env.ADMIN_TOKEN || "";
 const maxBodyBytes = 2 * 1024 * 1024;
-const maxBackups = 5;
 const pageDirs = new Set(["admin", "team", "papers", "research", "resources", "news", "join", "contact"]);
 const publicRootFiles = new Set(["index.html", "styles.css", "script.js", "site-data.js", "papers-data.js", "content.json"]);
 
@@ -33,21 +32,6 @@ function send(res, status, body, type = "text/plain; charset=utf-8") {
     "Referrer-Policy": "strict-origin-when-cross-origin"
   });
   res.end(body);
-}
-
-function rotateBackups() {
-  for (let index = maxBackups - 1; index >= 1; index -= 1) {
-    const from = `${contentFile}.bak.${index}`;
-    const to = `${contentFile}.bak.${index + 1}`;
-    if (fs.existsSync(from)) fs.renameSync(from, to);
-  }
-  if (fs.existsSync(contentFile)) fs.copyFileSync(contentFile, `${contentFile}.bak.1`);
-}
-
-function atomicWriteJson(file, data) {
-  const tempFile = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf8");
-  fs.renameSync(tempFile, file);
 }
 
 function hasFileExtension(pathname) {
@@ -79,6 +63,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/content") {
+    readContentData()
+      .then(({ data, source }) => {
+        send(res, 200, JSON.stringify({ ok: true, source, data }), "application/json; charset=utf-8");
+      })
+      .catch(() => {
+        send(res, 500, JSON.stringify({ ok: false, error: "read_failed" }), "application/json; charset=utf-8");
+      });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/content") {
     if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
       send(res, 401, JSON.stringify({ ok: false, error: "unauthorized" }), "application/json; charset=utf-8");
@@ -105,9 +100,13 @@ const server = http.createServer((req, res) => {
           send(res, 400, JSON.stringify({ ok: false, error: "invalid_schema", details: validation.errors }), "application/json; charset=utf-8");
           return;
         }
-        rotateBackups();
-        atomicWriteJson(contentFile, data);
-        send(res, 200, JSON.stringify({ ok: true }), "application/json; charset=utf-8");
+        writeContentData(data)
+          .then(({ source }) => {
+            send(res, 200, JSON.stringify({ ok: true, source }), "application/json; charset=utf-8");
+          })
+          .catch(() => {
+            send(res, 500, JSON.stringify({ ok: false, error: "write_failed" }), "application/json; charset=utf-8");
+          });
       } catch {
         send(res, 400, JSON.stringify({ ok: false }), "application/json; charset=utf-8");
       }

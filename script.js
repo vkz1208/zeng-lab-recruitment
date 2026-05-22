@@ -543,6 +543,15 @@ function routeFromPath() {
 
 async function getServerData() {
   try {
+    const res = await fetch("/api/content", { cache: "no-store" });
+    if (res.ok) {
+      const payload = await res.json();
+      if (payload?.ok && payload.data && typeof payload.data === "object") return payload.data;
+    }
+  } catch {
+    // Fall back to bundled static data below.
+  }
+  try {
     const res = await fetch("content.json", { cache: "no-store" });
     if (!res.ok) return {};
     return await res.json();
@@ -559,9 +568,11 @@ async function saveServerData(data) {
       headers: { "Content-Type": "application/json", "X-Admin-Token": token },
       body: JSON.stringify(data)
     });
-    return res.ok;
+    if (!res.ok) return { ok: false };
+    const payload = await res.json().catch(() => ({}));
+    return { ok: true, source: payload.source || "server" };
   } catch {
-    return false;
+    return { ok: false };
   }
 }
 
@@ -1398,9 +1409,17 @@ function installAdminHandlers() {
 
   $("#save-admin")?.addEventListener("click", async () => {
     syncAdminFields();
-    const saved = await saveServerData(siteData);
-    localStorage.setItem(STORAGE_KEY, saved ? "" : JSON.stringify(siteData));
-    alert(saved ? "已保存到 content.json。" : "已保存到当前浏览器。静态部署如需全站同步，需要后端存储。");
+    const result = await saveServerData(siteData);
+    if (result.ok) {
+      localStorage.removeItem(STORAGE_KEY);
+      const message = result.source === "blob"
+        ? (lang === "zh" ? "\u5df2\u4fdd\u5b58\u5230\u7ebf\u4e0a\u5b58\u50a8\uff0c\u5168\u7ad9\u5237\u65b0\u540e\u751f\u6548\u3002" : "Saved to online storage. The whole site will use it after refresh.")
+        : (lang === "zh" ? "\u5df2\u4fdd\u5b58\u5230\u672c\u5730 content.json\u3002" : "Saved to local content.json.");
+      alert(message);
+      return;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(siteData));
+    alert(lang === "zh" ? "\u7ebf\u4e0a\u4fdd\u5b58\u5931\u8d25\uff0c\u5df2\u4e34\u65f6\u4fdd\u5b58\u5230\u5f53\u524d\u6d4f\u89c8\u5668\u3002" : "Online save failed. Changes were saved temporarily in this browser.");
   });
 
   $("#reset-admin")?.addEventListener("click", async () => {
@@ -1410,7 +1429,8 @@ function installAdminHandlers() {
       en: structuredClone(window.DEFAULT_SITE_DATA.en)
     };
     localStorage.removeItem(STORAGE_KEY);
-    await saveServerData({});
+    const result = await saveServerData({});
+    if (!result.ok) localStorage.setItem(STORAGE_KEY, JSON.stringify(siteData));
     renderAdminPreview();
   });
 }

@@ -10,6 +10,11 @@ const files = [
   "site-data.js",
   "papers-data.js",
   "content.json",
+  "content-schema.js",
+  "content-store.js",
+  "package.json",
+  "package-lock.json",
+  "api/content.js",
   "admin/index.html",
   "contact/index.html",
   "join/index.html",
@@ -37,5 +42,6 @@ fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 files.forEach(copyFile);
 copyDir("assets");
+copyDir("node_modules");
 
 console.log(`Static Vercel output written to ${outDir}`);
