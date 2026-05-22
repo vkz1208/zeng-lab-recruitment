@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const contentBlobPath = process.env.CONTENT_BLOB_PATH || "content/content.json";
+const contentBlobPath = process.env.CONTENT_BLOB_PATH || "content.json";
 const localContentFile = path.join(__dirname, "content.json");
 const maxBackups = 5;
 
