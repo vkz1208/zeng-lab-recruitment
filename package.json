@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node local-server.js",
     "build": "node vercel-build.js",
-    "check": "node --check site-data.js && node --check papers-data.js && node --check api-client.js && node --check admin-ui.js && node --check public-pages-ui.js && node --check team-ui.js && node --check script.js && node --check local-server.js && node --check tenant-auth.js && node --check tenant-model.js && node --check tenant-store.js && node --check api-utils.js && node --check academic-site-generator.js && node --check ai-provider.js && node --check platform-config.js && node --check analytics-store.js && node --check review-store.js",
+    "check": "node --check site-data.js && node --check papers-data.js && node --check api-client.js && node --check admin-ui.js && node --check admin-auth-ui.js && node --check public-pages-ui.js && node --check team-ui.js && node --check script.js && node --check local-server.js && node --check tenant-auth.js && node --check tenant-model.js && node --check tenant-store.js && node --check api-utils.js && node --check academic-site-generator.js && node --check ai-provider.js && node --check platform-config.js && node --check analytics-store.js && node --check review-store.js",
     "test": "npm run check && node .tools/unit-tests.js && node .tools/smoke-tests.js && node .tools/spec-regression-tests.js",
     "test:admin-crud": "npm run check && node .tools/admin-crud-e2e.js",
     "test:full-flow": "npm run check && node .tools/full-flow-e2e.js",

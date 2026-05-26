@@ -28,6 +28,7 @@ const publicRootFiles = new Set([
   "admin.css",
   "api-client.js",
   "admin-ui.js",
+  "admin-auth-ui.js",
   "public-pages-ui.js",
   "team-ui.js",
   "script.js",
