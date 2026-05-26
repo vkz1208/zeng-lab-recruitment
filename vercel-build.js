@@ -6,16 +6,26 @@ const outDir = path.join(root, "dist");
 const files = [
   "index.html",
   "styles.css",
+  "admin.css",
+  "api-client.js",
+  "admin-ui.js",
   "script.js",
   "site-data.js",
   "papers-data.js",
   "content.json",
+  "api-utils.js",
   "content-schema.js",
   "content-store.js",
-  "package.json",
-  "package-lock.json",
-  "api/content.js",
+  "analytics-store.js",
+  "review-store.js",
+  "academic-site-generator.js",
+  "ai-provider.js",
+  "platform-config.js",
+  "tenant-auth.js",
+  "tenant-model.js",
+  "tenant-store.js",
   "admin/index.html",
+  "super-admin/index.html",
   "contact/index.html",
   "join/index.html",
   "news/index.html",
@@ -42,6 +52,6 @@ fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 files.forEach(copyFile);
 copyDir("assets");
-copyDir("node_modules");
+copyDir("data");
 
 console.log(`Static Vercel output written to ${outDir}`);

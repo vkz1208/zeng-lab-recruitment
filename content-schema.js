@@ -54,6 +54,44 @@ function validatePaperItems(items, path, errors) {
   });
 }
 
+function validateDynamicModules(items, path, errors) {
+  if (!Array.isArray(items)) {
+    errors.push(`${path} must be an array`);
+    return;
+  }
+  items.forEach((item, index) => {
+    if (!isPlainObject(item)) {
+      errors.push(`${path}.${index} must be an object`);
+      return;
+    }
+    if (!hasText(item, "type")) errors.push(`${path}.${index}.type must be a non-empty string`);
+    if (item.title != null && typeof item.title !== "string") errors.push(`${path}.${index}.title must be a string when present`);
+    if (item.copy != null && typeof item.copy !== "string") errors.push(`${path}.${index}.copy must be a string when present`);
+    if (item.items != null && !Array.isArray(item.items)) errors.push(`${path}.${index}.items must be an array when present`);
+  });
+}
+
+function validateDynamicPages(items, path, errors) {
+  if (!Array.isArray(items)) {
+    errors.push(`${path} must be an array`);
+    return;
+  }
+  items.forEach((item, index) => {
+    if (!isPlainObject(item)) {
+      errors.push(`${path}.${index} must be an object`);
+      return;
+    }
+    ["slug", "title"].forEach((field) => {
+      if (!hasText(item, field)) errors.push(`${path}.${index}.${field} must be a non-empty string`);
+    });
+    if (item.slug && !/^[a-z0-9-]+$/.test(item.slug)) errors.push(`${path}.${index}.slug must use lowercase letters, numbers, and hyphens`);
+    if (item.intro != null && typeof item.intro !== "string") errors.push(`${path}.${index}.intro must be a string when present`);
+    if (item.enabled != null && typeof item.enabled !== "boolean") errors.push(`${path}.${index}.enabled must be a boolean when present`);
+    if (item.order != null && typeof item.order !== "number") errors.push(`${path}.${index}.order must be a number when present`);
+    if (item.modules != null) validateDynamicModules(item.modules, `${path}.${index}.modules`, errors);
+  });
+}
+
 function validateContentData(data) {
   const errors = [];
   if (!isPlainObject(data)) return { valid: false, errors: ["content must be an object"] };
@@ -69,6 +107,7 @@ function validateContentData(data) {
 
     if (section.meta != null && !isPlainObject(section.meta)) errors.push(`${locale}.meta must be an object`);
     if (section.nav != null && !Array.isArray(section.nav)) errors.push(`${locale}.nav must be an array`);
+    if (section.pages != null) validateDynamicPages(section.pages, `${locale}.pages`, errors);
     if (section.home != null && !isPlainObject(section.home)) errors.push(`${locale}.home must be an object`);
     if (section.team != null && !isPlainObject(section.team)) errors.push(`${locale}.team must be an object`);
     if (section.papers != null) {

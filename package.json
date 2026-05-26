@@ -4,12 +4,18 @@
   "private": true,
   "description": "Recruitment website for Zhenzhong Zeng Lab, AI for Climate.",
   "scripts": {
-    "start": "node server.js",
-    "check": "node --check script.js && node --check server.js",
-    "test": "npm run check && node .tools/unit-tests.js && node .tools/smoke-tests.js",
-    "test:admin-crud": "npm run check && node .tools/admin-crud-e2e.js"
+    "start": "node local-server.js",
+    "build": "node vercel-build.js",
+    "check": "node --check site-data.js && node --check papers-data.js && node --check api-client.js && node --check admin-ui.js && node --check script.js && node --check local-server.js && node --check tenant-auth.js && node --check tenant-model.js && node --check tenant-store.js && node --check api-utils.js && node --check academic-site-generator.js && node --check ai-provider.js && node --check platform-config.js && node --check analytics-store.js && node --check review-store.js",
+    "test": "npm run check && node .tools/unit-tests.js && node .tools/smoke-tests.js && node .tools/spec-regression-tests.js",
+    "test:admin-crud": "npm run check && node .tools/admin-crud-e2e.js",
+    "test:full-flow": "npm run check && node .tools/full-flow-e2e.js",
+    "test:prod-admin-flow": "node .tools/production-admin-flow-test.js"
   },
   "dependencies": {
     "@vercel/blob": "^2.4.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.60.0"
   }
 }

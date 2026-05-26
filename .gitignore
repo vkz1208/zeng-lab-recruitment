@@ -2,7 +2,11 @@
 .vercel/
 node_modules/
 dist/
+.data/
 npm-debug.log*
 *.xlsx
+content.json.bak.*
+content.json.*.tmp
 
 .vercel
+.env*.local

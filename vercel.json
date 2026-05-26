@@ -1,14 +1,174 @@
 {
-  "buildCommand": "node vercel-build.js",
-  "outputDirectory": "dist",
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/admin",
-      "destination": "/admin/index.html"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     },
     {
-      "source": "/admin/",
-      "destination": "/admin/index.html"
+      "src": "api/content.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "api-utils.js",
+          "ai-provider.js",
+          "academic-site-generator.js",
+          "content-schema.js",
+          "content-store.js",
+          "tenant-auth.js",
+          "content.json"
+        ]
+      }
+    },
+    {
+      "src": "api/auth/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "api-utils.js",
+          "content-store.js",
+          "platform-config.js",
+          "tenant-auth.js"
+        ]
+      }
+    },
+    {
+      "src": "api/platform/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "api-utils.js",
+          "platform-config.js"
+        ]
+      }
+    },
+    {
+      "src": "api/wechat/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "api-utils.js",
+          "content-store.js",
+          "platform-config.js",
+          "review-store.js",
+          "tenant-auth.js"
+        ]
+      }
+    },
+    {
+      "src": "api/tenant/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "analytics-store.js",
+          "api-utils.js",
+          "ai-provider.js",
+          "academic-site-generator.js",
+          "content-schema.js",
+          "content-store.js",
+          "platform-config.js",
+          "review-store.js",
+          "tenant-auth.js",
+          "content.json"
+        ]
+      }
+    },
+    {
+      "src": "api/super/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "api-utils.js",
+          "content-store.js",
+          "platform-config.js",
+          "tenant-auth.js"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/auth/register",
+      "dest": "/api/auth/register.js"
+    },
+    {
+      "src": "/api/auth/verify-email",
+      "dest": "/api/auth/verify-email.js"
+    },
+    {
+      "src": "/api/auth/login",
+      "dest": "/api/auth/login.js"
+    },
+    {
+      "src": "/api/auth/logout",
+      "dest": "/api/auth/logout.js"
+    },
+    {
+      "src": "/api/auth/me",
+      "dest": "/api/auth/me.js"
+    },
+    {
+      "src": "/api/auth/change-password",
+      "dest": "/api/auth/change-password.js"
+    },
+    {
+      "src": "/api/platform/config",
+      "dest": "/api/platform/config.js"
+    },
+    {
+      "src": "/api/tenant/content",
+      "dest": "/api/tenant/content.js"
+    },
+    {
+      "src": "/api/tenant/ai",
+      "dest": "/api/tenant/ai.js"
+    },
+    {
+      "src": "/api/tenant/onboarding",
+      "dest": "/api/tenant/onboarding.js"
+    },
+    {
+      "src": "/api/tenant/settings",
+      "dest": "/api/tenant/settings.js"
+    },
+    {
+      "src": "/api/tenant/analytics",
+      "dest": "/api/tenant/analytics.js"
+    },
+    {
+      "src": "/api/tenant/review-queue",
+      "dest": "/api/tenant/review-queue.js"
+    },
+    {
+      "src": "/api/wechat/review-items",
+      "dest": "/api/wechat/review-items.js"
+    },
+    {
+      "src": "/api/super/tenants",
+      "dest": "/api/super/tenants.js"
+    },
+    {
+      "src": "/api/content",
+      "dest": "/api/content.js"
+    },
+    {
+      "src": "/admin/?",
+      "dest": "/admin/index.html"
+    },
+    {
+      "src": "/super-admin/?",
+      "dest": "/super-admin/index.html"
+    },
+    {
+      "src": "^/[^.]*$",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }

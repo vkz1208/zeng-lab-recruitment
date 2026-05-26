@@ -19,6 +19,12 @@ let newsPage = 1;
 let adminMode = false;
 let adminPreviewRoute = "team";
 let adminPanelOpen = false;
+let authContext = null;
+let onboardingDraft = null;
+let platformConfig = { plans: [], stylePlugins: [], defaultFeatures: {} };
+let onboardingStylePluginId = "sustech-lab";
+let legacyAdminMode = false;
+let shouldApplyDefaultTeamOrder = true;
 
 function $(selector, root = document) {
   return root.querySelector(selector);
@@ -481,6 +487,7 @@ function reorderMembersByRole(sections = [], roleRows, langKey, keepFirstSection
 }
 
 function applyTeamRoleOrder() {
+  if (!shouldApplyDefaultTeamOrder) return;
   ["zh", "en"].forEach((langKey) => {
     const team = siteData[langKey]?.team;
     if (!team) return;
@@ -538,42 +545,26 @@ function routeFromPath() {
   const last = path.split("/").filter(Boolean).pop();
   if (!last || last === "zzz" || last === "zeng-lab-recruitment") return "home";
   if (last === "admin") return "admin";
-  return ["team", "papers", "research", "resources", "news", "join", "contact"].includes(last) ? last : "home";
+  if (last === "super-admin") return "super-admin";
+  if (["team", "papers", "research", "resources", "news", "join", "contact"].includes(last)) return last;
+  return findDynamicPage(last) ? `page:${last}` : "home";
 }
 
-async function getServerData() {
-  try {
-    const res = await fetch("/api/content", { cache: "no-store" });
-    if (res.ok) {
-      const payload = await res.json();
-      if (payload?.ok && payload.data && typeof payload.data === "object") return payload.data;
-    }
-  } catch {
-    // Fall back to bundled static data below.
-  }
-  try {
-    const res = await fetch("content.json", { cache: "no-store" });
-    if (!res.ok) return {};
-    return await res.json();
-  } catch {
-    return {};
-  }
+function dynamicPages(langKey = lang) {
+  return (siteData[langKey]?.pages || [])
+    .filter((page) => page && page.enabled !== false && page.slug && page.title)
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
 }
 
-async function saveServerData(data) {
-  try {
-    const token = sessionStorage.getItem("zeng-admin-token") || "";
-    const res = await fetch("/api/content", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) return { ok: false };
-    const payload = await res.json().catch(() => ({}));
-    return { ok: true, source: payload.source || "server" };
-  } catch {
-    return { ok: false };
-  }
+function findDynamicPage(slug, langKey = lang) {
+  return dynamicPages(langKey).find((page) => page.slug === slug);
+}
+
+function visibleNavItems() {
+  const d = data();
+  const existing = d.nav || [];
+  const dynamic = dynamicPages().map((page) => ({ label: page.title, href: `/${page.slug}` }));
+  return [...existing, ...dynamic];
 }
 
 function mergeData(base, patch) {
@@ -587,6 +578,13 @@ function mergeData(base, patch) {
     }
   }
   return base;
+}
+
+function ensureContentExtensions() {
+  ["zh", "en"].forEach((locale) => {
+    siteData[locale] = siteData[locale] || {};
+    if (!Array.isArray(siteData[locale].pages)) siteData[locale].pages = [];
+  });
 }
 
 function pageHero(title, intro, titlePath = "", introPath = "", groupPath = "") {
@@ -704,7 +702,7 @@ function renderShell(content) {
         <span class="brand-school-lockup"><img src="${lang === "zh" ? "assets/branding/sustech-lockup-cn-en-crop.png" : "assets/branding/sustech-lockup-en-crop.png"}" alt="${lang === "zh" ? "南方科技大学" : "Southern University of Science and Technology"}" /></span>
       </a>
       <nav class="desktop-nav">
-        ${d.nav.map((item) => `<a href="${hrefToRoute(item.href)}">${esc(item.label)}</a>`).join("")}
+        ${visibleNavItems().map((item) => `<a href="${hrefToRoute(item.href)}">${esc(item.label)}</a>`).join("")}
       </nav>
       <div class="header-actions">
         <button class="ghost-button" id="language-toggle" type="button">${lang === "zh" ? "EN" : "中文"}</button>
@@ -712,7 +710,7 @@ function renderShell(content) {
       </div>
     </header>
     <div class="mobile-drawer" id="mobile-drawer">
-      ${d.nav.map((item) => `<a href="${hrefToRoute(item.href)}">${esc(item.label)}</a>`).join("")}
+      ${visibleNavItems().map((item) => `<a href="${hrefToRoute(item.href)}">${esc(item.label)}</a>`).join("")}
     </div>
     <main>${content}</main>
     <footer>
@@ -861,22 +859,28 @@ function firstMemberCollectionPath(section, fallbackPath) {
 }
 
 function normalizeAlumniSections(rawSections = [], langKey = "zh") {
-  const order = langKey === "zh"
-    ? ["已出站博士后", "已毕业博士", "已毕业硕士", "已毕业本科生", "已离职科研助理", "历史访问人员"]
-    : ["Former Postdoctoral Fellow", "PhD Alumni", "Master Alumni", "Undergraduate Alumni", "Former Research Assistant", "Former Visitor"];
-  const grouped = new Map(order.map((role) => [role, { title: role, members: [] }]));
-  rawSections.forEach((section, sectionIndex) => {
-    (section.members || []).forEach((member, memberIndex) => {
-      const role = member.role || section.title;
-      if (!grouped.has(role)) grouped.set(role, { title: role, members: [] });
-      grouped.get(role).members.push({
+  return rawSections.map((section, sectionIndex) => ({
+    title: section.title,
+    members: (section.members || []).map((member, memberIndex) => ({
+      ...member,
+      _sourceSectionIndex: sectionIndex,
+      _sourceMemberIndex: memberIndex
+    }))
+  })).filter((section) => section.members.length);
+}
+
+function preserveCurrentTeamSections(rawSections = []) {
+  return rawSections
+    .map((section, sectionIndex) => ({ section, sectionIndex }))
+    .filter(({ section, sectionIndex }) => sectionIndex !== 0 && (section.members || []).length)
+    .map(({ section, sectionIndex }) => ({
+      title: section.title,
+      members: (section.members || []).map((member, memberIndex) => ({
         ...member,
         _sourceSectionIndex: sectionIndex,
         _sourceMemberIndex: memberIndex
-      });
-    });
-  });
-  return [...grouped.values()].filter((section) => section.members.length);
+      }))
+    }));
 }
 
 function piCard(pi) {
@@ -920,7 +924,9 @@ function piCard(pi) {
 function renderTeam() {
   const t = data().team;
   const pi = t.pi || t.sections?.[0]?.members?.[0] || {};
-  const sections = normalizeCurrentTeamSections(t.sections || [], lang);
+  const sections = shouldApplyDefaultTeamOrder
+    ? normalizeCurrentTeamSections(t.sections || [], lang)
+    : preserveCurrentTeamSections(t.sections || []);
   const alumniSections = normalizeAlumniSections(t.alumniSections || [], lang);
   const teamAddPath = teamTab === "alumni" ? `root.${lang}.team.alumniSections.0.members` : `root.${lang}.team.sections.1.members`;
   const currentContent = `
@@ -1144,780 +1150,234 @@ function renderContact() {
   `);
 }
 
-function pathSet(obj, path, value) {
-  const parts = path.split(".");
-  let cursor = obj;
-  while (parts.length > 1) {
-    const key = parts.shift();
-    if (BLOCKED_MERGE_KEYS.has(key)) return;
-    cursor[key] = cursor[key] || {};
-    cursor = cursor[key];
+function renderDynamicModule(module, pageIndex, moduleIndex) {
+  const basePath = `root.${lang}.pages.${pageIndex}.modules.${moduleIndex}`;
+  if (module.type === "cards") {
+    const items = Array.isArray(module.items) ? module.items : [];
+    return `
+      <section class="content-section">
+        ${adminGroupButton(basePath, module.title)}
+        <div class="section-head"><h2>${editableInline(module.title || "", `${basePath}.title`)}</h2>${adminAddButton(`${basePath}.items`, "resource", lang === "zh" ? "新增卡片" : "Add card")}</div>
+        <div class="card-grid">
+          ${items.map((item, index) => `<article>${adminGroupButton(`${basePath}.items.${index}`, item.title)}${adminDeleteButton(`${basePath}.items.${index}`, item.title)}${adminMoveButtons(`${basePath}.items.${index}`, item.title)}${editableText(item.title || "", `${basePath}.items.${index}.title`, "h3")}${editableText(item.copy || "", `${basePath}.items.${index}.copy`, "p", "", "long")}</article>`).join("")}
+        </div>
+      </section>
+    `;
   }
-  if (BLOCKED_MERGE_KEYS.has(parts[0])) return;
-  cursor[parts[0]] = value;
-}
-
-function pathDelete(obj, path) {
-  const parts = path.split(".");
-  const key = parts.pop();
-  const parent = parts.reduce((cursor, part) => BLOCKED_MERGE_KEYS.has(part) ? undefined : cursor?.[part], obj);
-  if (!parent || BLOCKED_MERGE_KEYS.has(key)) return false;
-  if (Array.isArray(parent) && /^\d+$/.test(key)) {
-    parent.splice(Number(key), 1);
-    return true;
-  }
-  if (Object.prototype.hasOwnProperty.call(parent, key)) {
-    delete parent[key];
-    return true;
-  }
-  return false;
-}
-
-function pathMove(obj, path, direction) {
-  const parts = path.split(".");
-  const key = parts.pop();
-  const parent = parts.reduce((cursor, part) => BLOCKED_MERGE_KEYS.has(part) ? undefined : cursor?.[part], obj);
-  if (!Array.isArray(parent) || !/^\d+$/.test(key)) return false;
-  const from = Number(key);
-  const to = from + Number(direction);
-  if (from < 0 || from >= parent.length || to < 0 || to >= parent.length) return false;
-  const [item] = parent.splice(from, 1);
-  parent.splice(to, 0, item);
-  return true;
-}
-
-function pathGet(obj, path) {
-  return path.split(".").reduce((cursor, key) => BLOCKED_MERGE_KEYS.has(key) ? undefined : cursor?.[key], obj);
-}
-
-function syncAdminFields() {
-  document.querySelectorAll("[data-field]").forEach((field) => {
-    const value = field.type === "checkbox" ? field.checked : field.value;
-    pathSet(siteData, field.dataset.field.replace(/^root\./, ""), value);
-  });
-}
-
-function isImageField(path = "") {
-  return /image|Image|heroImage|teamImage/.test(path);
-}
-
-function renderAdminImagePreview(value, path) {
-  if (!isImageField(path)) return "";
-  const type = imageTypeFromPath(path);
   return `
-    <div class="admin-image-preview admin-image-preview--${esc(type)}" data-preview="${esc(path)}">
-      ${cardImage(value, path, type)}
-    </div>
+    <section class="content-section dynamic-text-section">
+      ${adminGroupButton(basePath, module.title)}
+      ${module.title ? editableText(module.title, `${basePath}.title`, "h2") : ""}
+      ${editableText(module.copy || "", `${basePath}.copy`, "p", "", "long")}
+    </section>
   `;
 }
 
-function renderEditor(value, path) {
-  if (Array.isArray(value)) {
-    return `
-      <details open class="admin-group">
-        <summary>${esc(path)} <button data-add="${esc(path)}" type="button">添加卡片</button></summary>
-        ${value.map((item, index) => `
-          <div class="admin-array-item">
-            <button data-delete="${esc(path)}" data-index="${index}" type="button">删除</button>
-            ${renderEditor(item, `${path}.${index}`)}
-          </div>
-        `).join("")}
-      </details>
-    `;
-  }
-  if (value && typeof value === "object") {
-    return `<details open class="admin-group"><summary>${esc(path)}</summary>${Object.keys(value).map((key) => renderEditor(value[key], `${path}.${key}`)).join("")}</details>`;
-  }
-  if (typeof value === "boolean") {
-    return `
-      <label class="admin-field admin-field--checkbox">
-        <span>${esc(path)}</span>
-        <input type="checkbox" data-field="${esc(path)}" ${value ? "checked" : ""} />
-      </label>
-    `;
-  }
-  const stringValue = value == null ? "" : String(value);
-  const isLong = stringValue.length > 70;
-  return `
-    <label class="admin-field">
-      <span>${esc(path)}</span>
-      ${isLong ? `<textarea data-field="${esc(path)}">${esc(stringValue)}</textarea>` : `<input data-field="${esc(path)}" value="${esc(stringValue)}" />`}
-      ${renderAdminImagePreview(stringValue, path)}
-      ${isImageField(path) ? `<input type="file" accept="image/*" data-upload="${esc(path)}" />` : ""}
-    </label>
-  `;
+function renderDynamicPage(slug) {
+  const pages = siteData[lang]?.pages || [];
+  const pageIndex = pages.findIndex((page) => page?.slug === slug && page.enabled !== false);
+  const page = pages[pageIndex];
+  if (!page) return renderHome();
+  const modules = Array.isArray(page.modules) ? page.modules : [];
+  renderShell(`
+    ${pageHero(page.title, page.intro, `root.${lang}.pages.${pageIndex}.title`, `root.${lang}.pages.${pageIndex}.intro`, `root.${lang}.pages.${pageIndex}`)}
+    ${adminGroupButton(`root.${lang}.pages.${pageIndex}`, page.title)}
+    <section class="content-section">
+      <div class="admin-section-actions">${adminAddButton(`root.${lang}.pages.${pageIndex}.modules`, "dynamicText", lang === "zh" ? "新增模块" : "Add module")}</div>
+    </section>
+    ${modules.map((module, index) => renderDynamicModule(module, pageIndex, index)).join("")}
+  `);
 }
 
-function adminRouteOptions() {
-  const labels = {
-    home: lang === "zh" ? "首页" : "Home",
-    team: lang === "zh" ? "团队" : "Team",
-    papers: lang === "zh" ? "论文" : "Papers",
-    research: lang === "zh" ? "研究" : "Research",
-    news: lang === "zh" ? "新闻" : "News",
-    join: lang === "zh" ? "加入我们" : "Join",
-    contact: lang === "zh" ? "联系" : "Contact"
-  };
-  return ["home", "team", "papers", "research", "news", "join", "contact"]
-    .map((route) => `<option value="${route}" ${adminPreviewRoute === route ? "selected" : ""}>${esc(labels[route])}</option>`)
+function planName(planId = "") {
+  return platformConfig.plans.find((plan) => plan.id === planId)?.name || planId || "Starter";
+}
+
+function stylePluginOptions(selected = "") {
+  const plugins = platformConfig.stylePlugins.length ? platformConfig.stylePlugins : [{ id: "sustech-lab", name: "SUSTech Lab" }];
+  return plugins
+    .filter((plugin) => plugin.status !== "disabled")
+    .map((plugin) => `<option value="${esc(plugin.id)}" ${plugin.id === selected ? "selected" : ""}>${esc(plugin.name)} ${plugin.version ? `v${esc(plugin.version)}` : ""}</option>`)
     .join("");
 }
 
-function routeFromAdminHref(href = "") {
-  const clean = href.replace(/^\.?\//, "").replace(/\/+$/, "");
-  if (!clean || clean === "#") return "home";
-  return ["team", "papers", "research", "news", "join", "contact"].includes(clean) ? clean : "";
-}
-
-function injectAdminChrome() {
-  app.insertAdjacentHTML("beforeend", `
-    <div class="admin-preview-toolbar" role="region" aria-label="Admin preview controls">
-      <strong>${lang === "zh" ? "所见即所得编辑" : "Visual Editor"}</strong>
-      <label>
-        <span>${lang === "zh" ? "预览页面" : "Preview"}</span>
-        <select id="admin-page-select">${adminRouteOptions()}</select>
-      </label>
-      <button id="save-admin" class="save" type="button">${lang === "zh" ? "保存生效" : "Save"}</button>
-      <button id="reset-admin" type="button">${lang === "zh" ? "恢复默认" : "Reset"}</button>
-      <a class="button secondary" href="${hrefToRoute("/")}">${lang === "zh" ? "退出后台" : "Exit"}</a>
-    </div>
-    <div class="inline-edit-modal" id="inline-edit-modal" hidden>
-      <div class="inline-edit-backdrop" data-inline-close></div>
-      <form class="inline-edit-dialog" id="inline-edit-form">
-        <div class="inline-edit-head">
-          <div>
-            <p class="eyebrow">Edit</p>
-            <h2 id="inline-edit-title">${lang === "zh" ? "编辑内容" : "Edit Content"}</h2>
-          </div>
-          <button type="button" data-inline-close aria-label="Close">×</button>
+function renderTenantSettings() {
+  const tenant = authContext?.tenant || {};
+  const features = tenant.features || {};
+  renderShell(`
+    ${pageHero("Tenant Settings", "Manage the website style, domain routing, password, and enabled services.", "", "", "")}
+    <section class="tenant-settings content-section">
+      <form id="tenant-settings-form" class="settings-panel">
+        <h2>Website settings</h2>
+        <label>Current plan<input value="${esc(planName(tenant.planId))}" disabled /></label>
+        <label>Style plugin
+          <select name="stylePluginId" ${features.styleSwitching ? "" : "disabled"}>${stylePluginOptions(tenant.stylePluginId)}</select>
+        </label>
+        <label>Platform subdomain
+          <input name="subdomain" value="${esc(tenant.subdomain || tenant.slug || "")}" />
+        </label>
+        <label>Custom domains
+          <textarea name="domains" rows="3" ${features.customDomain ? "" : "disabled"}>${esc((tenant.domains || []).join(", "))}</textarea>
+        </label>
+        <div class="feature-grid">
+          ${Object.entries(features).map(([key, enabled]) => `<span class="${enabled ? "enabled" : ""}">${esc(key)}: ${enabled ? "on" : "off"}</span>`).join("")}
         </div>
-        <div class="inline-edit-body" id="inline-edit-body"></div>
-        <div class="inline-edit-actions">
-          <button type="button" data-inline-close>${lang === "zh" ? "取消" : "Cancel"}</button>
-          <button class="save" type="submit">${lang === "zh" ? "应用" : "Apply"}</button>
-        </div>
+        <button class="save" type="submit">Save settings</button>
       </form>
-    </div>
+      <form id="tenant-password-form" class="settings-panel">
+        <h2>Password</h2>
+        <label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required /></label>
+        <label>New password<input name="newPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+        <button class="save" type="submit">Change password</button>
+      </form>
+      <section class="settings-panel">
+        <div class="section-head"><h2>Dynamic pages</h2>${adminAddButton(`root.${lang}.pages`, "dynamicPage", "Add page")}</div>
+        <div class="settings-page-list">
+          ${(siteData[lang]?.pages || []).map((page, index) => `
+            <article>
+              ${adminGroupButton(`root.${lang}.pages.${index}`, page.title)}
+              ${adminDeleteButton(`root.${lang}.pages.${index}`, page.title)}
+              ${adminMoveButtons(`root.${lang}.pages.${index}`, page.title)}
+              <strong>${esc(page.title || page.slug || "Untitled")}</strong>
+              <span>/${esc(page.slug || "")} - ${page.enabled === false ? "hidden" : "visible"}</span>
+            </article>
+          `).join("") || `<p>No custom pages yet.</p>`}
+        </div>
+      </section>
+      <section class="settings-panel">
+        <h2>Analytics</h2>
+        <div id="tenant-analytics-panel"><p>Loading analytics...</p></div>
+      </section>
+      <section class="settings-panel">
+        <h2>Review queue</h2>
+        <div id="tenant-review-panel"><p>Loading review items...</p></div>
+      </section>
+    </section>
   `);
-  installAdminHandlers();
+  installTenantSettingsHandlers();
+  loadTenantDashboardPanels();
 }
 
-function installAdminHandlers() {
-  $("#admin-page-select")?.addEventListener("change", (event) => {
-    syncAdminFields();
-    adminPreviewRoute = event.target.value;
-    sessionStorage.setItem("zeng-admin-preview-route", adminPreviewRoute);
-    renderAdminPreview();
-  });
+async function loadTenantDashboardPanels() {
+  try {
+    const analytics = await apiJson("/api/tenant/analytics", { method: "GET", headers: {} });
+    const panel = $("#tenant-analytics-panel");
+    if (panel) {
+      panel.innerHTML = `
+        <div class="draft-metrics">
+          <span>${Number(analytics.totals?.pv || 0)} PV</span>
+          <span>${Number(analytics.totals?.uv || 0)} UV</span>
+        </div>
+        <div class="settings-page-list">
+          ${(analytics.days || []).slice(0, 7).map((day) => `<article><strong>${esc(day.date)}</strong><span>${Number(day.pv || 0)} PV / ${Number(day.uv || 0)} UV</span></article>`).join("") || "<p>No visits recorded yet.</p>"}
+        </div>
+      `;
+    }
+  } catch {
+    const panel = $("#tenant-analytics-panel");
+    if (panel) panel.innerHTML = "<p>Analytics are not available yet.</p>";
+  }
+  try {
+    const queue = await apiJson("/api/tenant/review-queue", { method: "GET", headers: {} });
+    const panel = $("#tenant-review-panel");
+    if (panel) {
+      panel.innerHTML = `
+        <div class="settings-page-list">
+          ${(queue.items || []).slice(0, 10).map((item) => `
+            <article data-review-id="${esc(item.id)}">
+              <strong>${esc(item.title)}</strong>
+              <span>${esc(item.status)} - ${esc(item.target || "news")}</span>
+              <p>${esc(item.summary || item.aiSuggestion || "")}</p>
+              <div class="auth-links">
+                <button type="button" data-review-status="approved">Approve</button>
+                <button type="button" data-review-status="rejected">Reject</button>
+                <button type="button" data-review-status="needs_revision">Needs revision</button>
+              </div>
+            </article>
+          `).join("") || "<p>No pending review items.</p>"}
+        </div>
+      `;
+      installReviewHandlers();
+    }
+  } catch {
+    const panel = $("#tenant-review-panel");
+    if (panel) panel.innerHTML = "<p>Review queue is not available yet.</p>";
+  }
+}
 
-  document.querySelectorAll("[data-inline-edit]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openInlineEditor(button.dataset.inlineEdit, button.dataset.editType || "text");
-    });
-  });
-
-  document.querySelectorAll("[data-inline-add]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openAddEditor(button.dataset.inlineAdd, button.dataset.addType || "item");
-    });
-  });
-
-  document.querySelectorAll("[data-inline-delete]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      deleteInlineItem(button.dataset.inlineDelete);
-    });
-  });
-
-  document.querySelectorAll("[data-inline-move]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      moveInlineItem(button.dataset.inlineMove, button.dataset.direction);
-    });
-  });
-
-  document.querySelectorAll(".site-header a, .mobile-drawer a").forEach((link) => {
-    link.addEventListener("click", (event) => {
-      const route = routeFromAdminHref(link.getAttribute("href") || "");
-      if (!route) return;
-      event.preventDefault();
-      syncAdminFields();
-      adminPreviewRoute = route;
-      sessionStorage.setItem("zeng-admin-preview-route", adminPreviewRoute);
-      renderAdminPreview();
-    });
-  });
-
-  document.querySelectorAll("[data-upload]").forEach((input) => {
-    input.addEventListener("change", () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
-        alert("请选择 2MB 以内的图片文件。");
-        input.value = "";
-        return;
+function installReviewHandlers() {
+  document.querySelectorAll("[data-review-status]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const row = button.closest("[data-review-id]");
+      if (!row) return;
+      try {
+        await apiJson("/api/tenant/review-queue", {
+          method: "POST",
+          body: JSON.stringify({ id: row.dataset.reviewId, status: button.dataset.reviewStatus })
+        });
+        loadTenantDashboardPanels();
+      } catch (error) {
+        alert(`Review update failed: ${error.message}`);
       }
-      const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        const field = document.querySelector(`[data-field="${CSS.escape(input.dataset.upload)}"]`);
-        if (field) {
-          field.value = reader.result;
-          field.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      });
-      reader.readAsDataURL(file);
     });
   });
-
-  document.querySelectorAll("[data-field]").forEach((field) => {
-    if (!isImageField(field.dataset.field)) return;
-    field.addEventListener("input", () => {
-      const preview = document.querySelector(`[data-preview="${CSS.escape(field.dataset.field)}"]`);
-      if (preview) preview.innerHTML = cardImage(field.value, field.dataset.field, imageTypeFromPath(field.dataset.field));
-      installImageFallbacks(preview);
-    });
-  });
-
-  document.querySelectorAll("[data-add]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      syncAdminFields();
-      const arr = pathGet(siteData, button.dataset.add.replace(/^root\./, ""));
-      if (!Array.isArray(arr)) return;
-      const sample = arr[0] ? structuredClone(arr[0]) : { title: "新卡片", copy: "请编辑内容", link: "" };
-      arr.push(sample);
-      renderAdminPreview();
-    });
-  });
-
-  document.querySelectorAll("[data-delete]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      syncAdminFields();
-      const arr = pathGet(siteData, button.dataset.delete.replace(/^root\./, ""));
-      if (!Array.isArray(arr)) return;
-      arr.splice(Number(button.dataset.index), 1);
-      renderAdminPreview();
-    });
-  });
-
-  $("#save-admin")?.addEventListener("click", async () => {
-    syncAdminFields();
-    const result = await saveServerData(siteData);
-    if (result.ok) {
-      localStorage.removeItem(STORAGE_KEY);
-      const message = result.source === "blob"
-        ? (lang === "zh" ? "\u5df2\u4fdd\u5b58\u5230\u7ebf\u4e0a\u5b58\u50a8\uff0c\u5168\u7ad9\u5237\u65b0\u540e\u751f\u6548\u3002" : "Saved to online storage. The whole site will use it after refresh.")
-        : (lang === "zh" ? "\u5df2\u4fdd\u5b58\u5230\u672c\u5730 content.json\u3002" : "Saved to local content.json.");
-      alert(message);
-      return;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(siteData));
-    alert(lang === "zh" ? "\u7ebf\u4e0a\u4fdd\u5b58\u5931\u8d25\uff0c\u5df2\u4e34\u65f6\u4fdd\u5b58\u5230\u5f53\u524d\u6d4f\u89c8\u5668\u3002" : "Online save failed. Changes were saved temporarily in this browser.");
-  });
-
-  $("#reset-admin")?.addEventListener("click", async () => {
-    if (!confirm("确定恢复默认内容？")) return;
-    siteData = {
-      zh: structuredClone(window.DEFAULT_SITE_DATA.zh),
-      en: structuredClone(window.DEFAULT_SITE_DATA.en)
-    };
-    localStorage.removeItem(STORAGE_KEY);
-    const result = await saveServerData({});
-    if (!result.ok) localStorage.setItem(STORAGE_KEY, JSON.stringify(siteData));
-    renderAdminPreview();
-  });
 }
 
-function closeInlineEditor() {
-  $("#inline-edit-modal")?.setAttribute("hidden", "");
-}
-
-function isPlainEditableObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value);
-}
-
-function collectGroupFields(value, basePath, depth = 0) {
-  if (!isPlainEditableObject(value) || depth > 3) return [];
-  return Object.entries(value).flatMap(([key, child]) => {
-    if (BLOCKED_MERGE_KEYS.has(key)) return [];
-    const path = `${basePath}.${key}`;
-    if (Array.isArray(child)) {
-      return child.every((item) => item == null || ["string", "number", "boolean"].includes(typeof item))
-        ? [{ path, key, value: child.join(", ") }]
-        : [];
-    }
-    if (isPlainEditableObject(child)) return collectGroupFields(child, path, depth + 1);
-    return [{ path, key, value: child }];
-  });
-}
-
-function fieldLabel(path) {
-  return adminFieldLabel(path);
-}
-
-const ADMIN_FIELD_LABELS = {
-  zh: {
-    title: "标题",
-    intro: "页面简介",
-    copy: "正文",
-    body: "正文",
-    name: "英文名",
-    cn: "中文名",
-    role: "角色",
-    started: "入组/去向信息",
-    destination: "去向",
-    bio: "简介",
-    image: "图片",
-    heroImage: "首页大图",
-    teamImage: "团队图片",
-    email: "邮箱",
-    link: "链接",
-    href: "链接",
-    text: "显示文字",
-    year: "年份",
-    journal: "期刊",
-    authors: "作者",
-    tags: "标签",
-    date: "日期",
-    featured: "是否精选论文",
-    homeFeatured: "是否首页展示",
-    eyebrow: "眉标题",
-    featureTitle: "特色标题",
-    featureCopy: "特色正文",
-    value: "数值",
-    label: "标签"
-  },
-  en: {
-    title: "Title",
-    intro: "Page intro",
-    copy: "Body",
-    body: "Body",
-    name: "English name",
-    cn: "Chinese name",
-    role: "Role",
-    started: "Start / destination",
-    destination: "Destination",
-    bio: "Bio",
-    image: "Image",
-    heroImage: "Hero image",
-    teamImage: "Team image",
-    email: "Email",
-    link: "Link",
-    href: "Link",
-    text: "Display text",
-    year: "Year",
-    journal: "Journal",
-    authors: "Authors",
-    tags: "Tags",
-    date: "Date",
-    featured: "Featured paper",
-    homeFeatured: "Show on home",
-    eyebrow: "Eyebrow",
-    featureTitle: "Feature title",
-    featureCopy: "Feature body",
-    value: "Value",
-    label: "Label"
-  }
-};
-
-const TEAM_ROLE_OPTIONS = {
-  zh: [
-    "大总管",
-    "教师",
-    "博士后",
-    "在读博士",
-    "在读硕士",
-    "在读本科生",
-    "科研教学助理",
-    "访问学者",
-    "访问学生",
-    "已出站博士后",
-    "已毕业博士",
-    "已毕业硕士",
-    "已毕业本科生",
-    "已离职科研助理",
-    "历史访问人员"
-  ],
-  en: [
-    "Lab Manager",
-    "Faculty",
-    "Postdoctoral Researcher",
-    "PhD Student",
-    "Master Student",
-    "Undergraduate Student",
-    "Research and Teaching Assistant",
-    "Visiting Scholar",
-    "Visiting Student",
-    "Former Postdoctoral Fellow",
-    "PhD Alumni",
-    "Master Alumni",
-    "Undergraduate Alumni",
-    "Former Research Assistant",
-    "Former Visitor"
-  ]
-};
-
-function adminFieldLabel(path) {
-  const key = path.replace(/^root\./, "").split(".").pop();
-  return ADMIN_FIELD_LABELS[lang]?.[key] || key;
-}
-
-function isTeamRoleField(path = "") {
-  return /\.team\.(sections|alumniSections)\.\d+\.members\.\d+\.role$/.test(path)
-    || /\.team\.(sections|alumniSections)\.\d+\.members\.role$/.test(path)
-    || /\.team\.(sections|alumniSections)\.members\.role$/.test(path);
-}
-
-function roleSelect(path, value = "") {
-  const options = TEAM_ROLE_OPTIONS[lang] || TEAM_ROLE_OPTIONS.zh;
-  const selected = String(value || "");
-  const extra = selected && !options.includes(selected) ? [selected] : [];
-  return `
-    <select data-inline-field="${esc(path)}">
-      ${[...extra, ...options].map((role) => `<option value="${esc(role)}" ${role === selected ? "selected" : ""}>${esc(role)}</option>`).join("")}
-    </select>
-  `;
-}
-
-function groupFieldControl(field) {
-  const value = field.value;
-  const path = field.path;
-  if (isTeamRoleField(path)) {
-    return `
-      <label class="inline-edit-field">
-        <span>${esc(fieldLabel(path))}</span>
-        ${roleSelect(path, value)}
-      </label>
-    `;
-  }
-  if (typeof value === "boolean") {
-    return `
-      <label class="inline-edit-field inline-edit-field--checkbox">
-        <span>${esc(fieldLabel(path))}</span>
-        <input data-inline-field="${esc(path)}" type="checkbox" ${value ? "checked" : ""} />
-      </label>
-    `;
-  }
-  const stringValue = value == null ? "" : String(value);
-  const long = /title|intro|copy|body|bio|abstract|description/i.test(path) || stringValue.length > 80;
-  const mediaUpload = isImageField(path) ? `
-    <label class="inline-edit-field inline-edit-field--upload">
-      <span>${lang === "zh" ? "上传图片" : "Upload image"}</span>
-      <input data-inline-file="${esc(path)}" type="file" accept="image/*" />
-    </label>
-  ` : "";
-  return `
-    <label class="inline-edit-field">
-      <span>${esc(fieldLabel(path))}</span>
-      ${long ? `<textarea data-inline-field="${esc(path)}">${esc(stringValue)}</textarea>` : `<input data-inline-field="${esc(path)}" value="${esc(stringValue)}" />`}
-    </label>
-    ${mediaUpload}
-  `;
-}
-
-function groupEditorControl(path, value) {
-  const fields = collectGroupFields(value, path);
-  if (!fields.length) {
-    return `<p class="inline-edit-empty">${lang === "zh" ? "这一组没有可直接编辑的文本、图片或开关字段。" : "This group has no directly editable text, image, or toggle fields."}</p>`;
-  }
-  return `
-    <div class="inline-edit-grid">
-      ${fields.map(groupFieldControl).join("")}
-    </div>
-    <p class="inline-edit-hint">${lang === "zh" ? "列表的新增、删除和排序请使用卡片上的按钮；复杂子列表暂不在此弹窗中编辑。" : "Use the card buttons to add, delete, and reorder list items. Complex nested lists are not edited in this dialog yet."}</p>
-  `;
-}
-
-function blankItem(type) {
-  const year = String(new Date().getFullYear());
-  const templates = {
-    paper: {
-      year,
-      title: "",
-      authors: "",
-      journal: "",
-      tags: "",
-      link: "",
-      featured: false,
-      homeFeatured: false
-    },
-    news: {
-      date: new Date().toISOString().slice(0, 10),
-      title: "",
-      copy: "",
-      image: "",
-      link: ""
-    },
-    resource: {
-      title: "",
-      copy: "",
-      image: "",
-      link: ""
-    },
-    researchDirection: {
-      title: "",
-      copy: "",
-      image: ""
-    },
-    teamMember: {
-      name: "",
-      cn: "",
-      role: lang === "zh" ? "在读博士" : "PhD Student",
-      started: "",
-      destination: "",
-      bio: "",
-      image: "",
-      email: ""
-    }
-  };
-  return structuredClone(templates[type] || templates.resource);
-}
-
-function normalizeAddedItem(type, item) {
-  if (type === "paper") {
-    return {
-      ...item,
-      tags: typeof item.tags === "string"
-        ? item.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean)
-        : (item.tags || [])
-    };
-  }
-  return item;
-}
-
-function normalizeInlineValue(path, value, field) {
-  if (/\.tags$/.test(path)) {
-    return String(value || "").split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
-  }
-  return field?.type === "checkbox" ? Boolean(value) : value;
-}
-
-function openAddEditor(path, type = "item") {
-  syncAdminFields();
-  const cleanPath = path.replace(/^root\./, "");
-  const value = blankItem(type);
-  const modal = $("#inline-edit-modal");
-  const body = $("#inline-edit-body");
-  if (!modal || !body) return;
-  modal.removeAttribute("hidden");
-  modal.dataset.path = cleanPath;
-  modal.dataset.type = "add";
-  modal.dataset.addType = type;
-  $("#inline-edit-title").textContent = lang === "zh" ? "新增卡片" : "Add Card";
-  body.innerHTML = groupEditorControl(path, value);
-
-  document.querySelectorAll("[data-inline-file]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
-        alert("请选择 2MB 以内的图片文件。");
-        input.value = "";
-        return;
-      }
-      const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        const field = $(`[data-inline-field="${CSS.escape(input.dataset.inlineFile)}"]`);
-        if (field) field.value = reader.result;
-      });
-      reader.readAsDataURL(file);
-    });
-  });
-
-  document.querySelectorAll("[data-inline-close]").forEach((button) => {
-    button.addEventListener("click", closeInlineEditor, { once: true });
-  });
-
-  $("#inline-edit-form").onsubmit = (event) => {
+function installTenantSettingsHandlers() {
+  $("#tenant-settings-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const nextItem = {};
-    document.querySelectorAll("[data-inline-field]").forEach((field) => {
-      const key = field.dataset.inlineField.split(".").pop();
-      nextItem[key] = normalizeInlineValue(field.dataset.inlineField, field.type === "checkbox" ? field.checked : field.value, field);
-    });
-    const collection = pathGet(siteData, cleanPath);
-    if (Array.isArray(collection)) {
-      collection.unshift(normalizeAddedItem(type, nextItem));
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.domains = String(data.domains || "").split(",").map((item) => item.trim()).filter(Boolean);
+    try {
+      const payload = await apiJson("/api/tenant/settings", { method: "POST", body: JSON.stringify(data) });
+      authContext.tenant = payload.tenant;
+      alert("Settings saved.");
+      renderTenantSettings();
+    } catch (error) {
+      alert(`Settings failed: ${error.message}`);
     }
-    closeInlineEditor();
-    paperPage = 1;
-    newsPage = 1;
-    renderAdminPreview();
-  };
-}
-
-function deleteInlineItem(path) {
-  if (!path) return;
-  syncAdminFields();
-  const label = lang === "zh" ? "确定删除这张卡片吗？" : "Delete this card?";
-  if (!confirm(label)) return;
-  pathDelete(siteData, path.replace(/^root\./, ""));
-  closeInlineEditor();
-  paperPage = 1;
-  newsPage = 1;
-  renderAdminPreview();
-}
-
-function moveInlineItem(path, direction) {
-  if (!path) return;
-  syncAdminFields();
-  pathMove(siteData, path.replace(/^root\./, ""), direction);
-  renderAdminPreview();
-}
-
-function inlineEditorControl(path, type, value) {
-  if (type === "group" && isPlainEditableObject(value)) {
-    return groupEditorControl(path, value);
-  }
-  if (type === "image") {
-    return `
-      <label class="inline-edit-field">
-        <span>${lang === "zh" ? "图片路径" : "Image path"}</span>
-        <input id="inline-edit-value" value="${esc(value || "")}" />
-      </label>
-      <label class="inline-edit-field">
-        <span>${lang === "zh" ? "上传图片" : "Upload image"}</span>
-        <input id="inline-edit-file" type="file" accept="image/*" />
-      </label>
-      ${value ? `<div class="inline-edit-preview">${cardImage(value, path, imageTypeFromPath(path))}</div>` : ""}
-    `;
-  }
-  if (typeof value === "boolean") {
-    return `
-      <label class="inline-edit-field inline-edit-field--checkbox">
-        <span>${lang === "zh" ? "启用" : "Enabled"}</span>
-        <input id="inline-edit-value" type="checkbox" ${value ? "checked" : ""} />
-      </label>
-    `;
-  }
-  const stringValue = value == null ? "" : String(value);
-  const long = type === "long" || stringValue.length > 80;
-  return `
-    <label class="inline-edit-field">
-      <span>${esc(fieldLabel(path))}</span>
-      ${long ? `<textarea id="inline-edit-value">${esc(stringValue)}</textarea>` : `<input id="inline-edit-value" value="${esc(stringValue)}" />`}
-    </label>
-  `;
-}
-
-function openInlineEditor(path, type = "text") {
-  syncAdminFields();
-  const cleanPath = path.replace(/^root\./, "");
-  const value = pathGet(siteData, cleanPath);
-  const modal = $("#inline-edit-modal");
-  const body = $("#inline-edit-body");
-  if (!modal || !body) return;
-  modal.removeAttribute("hidden");
-  modal.dataset.path = cleanPath;
-  modal.dataset.type = type;
-  $("#inline-edit-title").textContent = fieldLabel(path);
-  body.innerHTML = inlineEditorControl(path, type, value);
-  installImageFallbacks(body);
-
-  const handleInlineUpload = (event, targetPath = "") => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
-      alert("请选择 2MB 以内的图片文件。");
-      event.target.value = "";
-      return;
-    }
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      const selector = targetPath ? `[data-inline-field="${CSS.escape(targetPath)}"]` : "#inline-edit-value";
-      const field = $(selector);
-      if (field) field.value = reader.result;
-    });
-    reader.readAsDataURL(file);
-  };
-
-  $("#inline-edit-file")?.addEventListener("change", (event) => {
-    handleInlineUpload(event);
   });
-
-  document.querySelectorAll("[data-inline-file]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      handleInlineUpload(event, input.dataset.inlineFile);
-    });
-  });
-
-  document.querySelectorAll("[data-inline-close]").forEach((button) => {
-    button.addEventListener("click", closeInlineEditor, { once: true });
-  });
-
-  $("#inline-edit-form").onsubmit = (event) => {
+  $("#tenant-password-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (modal.dataset.type === "group") {
-      document.querySelectorAll("[data-inline-field]").forEach((field) => {
-        const nextValue = field.type === "checkbox" ? field.checked : field.value;
-        pathSet(siteData, field.dataset.inlineField.replace(/^root\./, ""), normalizeInlineValue(field.dataset.inlineField, nextValue, field));
-      });
-      closeInlineEditor();
-      renderAdminPreview();
-      return;
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      await apiJson("/api/auth/change-password", { method: "POST", body: JSON.stringify(data) });
+      form.reset();
+      alert("Password changed.");
+    } catch (error) {
+      alert(`Password change failed: ${error.message}`);
     }
-    const field = $("#inline-edit-value");
-    const nextValue = field?.type === "checkbox" ? field.checked : field?.value;
-    pathSet(siteData, modal.dataset.path, nextValue ?? "");
-    closeInlineEditor();
-    renderAdminPreview();
-  };
-}
-
-function renderAdminPreview() {
-  const map = {
-    home: renderHome,
-    team: renderTeam,
-    papers: renderPapers,
-    research: renderResearch,
-    resources: renderResources,
-    news: renderNews,
-    join: renderJoin,
-    contact: renderContact
-  };
-  (map[adminPreviewRoute] || renderTeam)();
-}
-
-function renderAdmin() {
-  const existingToken = sessionStorage.getItem("zeng-admin-token");
-  const token = existingToken || prompt("请输入管理令牌。请将本地服务环境变量 ADMIN_TOKEN 设置为相同值。");
-  const ok = Boolean(token);
-  if (!ok) {
-    alert("缺少管理令牌");
-    location.href = hrefToRoute("/");
-    return;
-  }
-  sessionStorage.setItem("zeng-admin-ok", "1");
-  sessionStorage.setItem("zeng-admin-token", token);
-  adminMode = true;
-  adminPreviewRoute = sessionStorage.getItem("zeng-admin-preview-route") || adminPreviewRoute;
-  if (adminPreviewRoute === "resources") adminPreviewRoute = "research";
-  renderAdminPreview();
+  });
 }
 
 function render() {
   const route = routeFromPath();
   if (route === "admin") return renderAdmin();
+  if (route === "super-admin") return renderSuperAdmin();
   adminMode = false;
   document.body.classList.remove("admin-preview-mode");
   const map = { home: renderHome, team: renderTeam, papers: renderPapers, research: renderResearch, resources: renderResources, news: renderNews, join: renderJoin, contact: renderContact };
+  if (route.startsWith("page:")) {
+    renderDynamicPage(route.slice(5));
+    trackVisit();
+    return;
+  }
   map[route]();
+  trackVisit();
 }
 
 async function init() {
+  await loadPlatformConfig();
+  if (typeof window.loadPaperList === "function") await window.loadPaperList();
   if (Array.isArray(window.PAPER_LIST) && window.PAPER_LIST.length) {
     siteData.zh.papers.items = structuredClone(window.PAPER_LIST);
     siteData.en.papers.items = structuredClone(window.PAPER_LIST);
   }
   const serverData = await getServerData();
   const localData = localStorage.getItem(STORAGE_KEY);
+  shouldApplyDefaultTeamOrder = !serverData || !Object.keys(serverData).length;
   mergeData(siteData, serverData);
   if (localData) {
     try {
@@ -1926,6 +1386,7 @@ async function init() {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
+  ensureContentExtensions();
   normalizeTeamData();
   applyTeamRoleOrder();
   render();

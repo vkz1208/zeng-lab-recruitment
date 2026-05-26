@@ -3,13 +3,36 @@ const fs = require("fs");
 const path = require("path");
 const { validateContentData } = require("./content-schema");
 const { readContentData, writeContentData } = require("./content-store");
+const authRegister = require("./api/auth/register");
+const authVerifyEmail = require("./api/auth/verify-email");
+const authLogin = require("./api/auth/login");
+const authLogout = require("./api/auth/logout");
+const authMe = require("./api/auth/me");
+const authChangePassword = require("./api/auth/change-password");
+const tenantContent = require("./api/tenant/content");
+const tenantOnboarding = require("./api/tenant/onboarding");
+const tenantSettings = require("./api/tenant/settings");
+const tenantAnalytics = require("./api/tenant/analytics");
+const tenantReviewQueue = require("./api/tenant/review-queue");
+const platformConfig = require("./api/platform/config");
+const superTenants = require("./api/super/tenants");
 
 const root = __dirname;
 const port = process.env.PORT || 3000;
 const adminToken = process.env.ADMIN_TOKEN || "";
 const maxBodyBytes = 2 * 1024 * 1024;
-const pageDirs = new Set(["admin", "team", "papers", "research", "resources", "news", "join", "contact"]);
-const publicRootFiles = new Set(["index.html", "styles.css", "script.js", "site-data.js", "papers-data.js", "content.json"]);
+const pageDirs = new Set(["admin", "super-admin", "team", "papers", "research", "resources", "news", "join", "contact"]);
+const publicRootFiles = new Set([
+  "index.html",
+  "styles.css",
+  "admin.css",
+  "api-client.js",
+  "admin-ui.js",
+  "script.js",
+  "site-data.js",
+  "papers-data.js",
+  "content.json"
+]);
 
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -44,15 +67,35 @@ function isPublicPath(relative) {
   if (!parts.length || parts.some((part) => part.startsWith("."))) return false;
   if (parts.length === 1) return publicRootFiles.has(parts[0]);
   if (parts[0] === "assets") return parts.length > 1;
+  if (parts[0] === "data") return parts.length === 2 && path.extname(parts[1]) === ".json";
   if (pageDirs.has(parts[0])) return parts.length === 2 && parts[1] === "index.html";
   return false;
 }
 
 function shouldFallbackToAppShell(pathname) {
   if (hasFileExtension(pathname)) return false;
-  const segment = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean)[0];
-  return !segment || pageDirs.has(segment);
+  if (pathname.startsWith("/api/")) return false;
+  const parts = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+  if (parts.some((part) => part.startsWith(".") || part === "..")) return false;
+  return true;
 }
+
+const apiRoutes = new Map([
+  ["/api/auth/register", authRegister],
+  ["/api/auth/verify-email", authVerifyEmail],
+  ["/api/auth/login", authLogin],
+  ["/api/auth/logout", authLogout],
+  ["/api/auth/me", authMe],
+  ["/api/auth/change-password", authChangePassword],
+  ["/api/tenant/content", tenantContent],
+  ["/api/tenant/onboarding", tenantOnboarding],
+  ["/api/tenant/settings", tenantSettings],
+  ["/api/tenant/analytics", tenantAnalytics],
+  ["/api/tenant/review-queue", tenantReviewQueue],
+  ["/api/wechat/review-items", tenantReviewQueue],
+  ["/api/platform/config", platformConfig],
+  ["/api/super/tenants", superTenants]
+]);
 
 const server = http.createServer((req, res) => {
   let url;
@@ -60,6 +103,11 @@ const server = http.createServer((req, res) => {
     url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   } catch {
     send(res, 400, "Bad request");
+    return;
+  }
+
+  if (apiRoutes.has(url.pathname)) {
+    apiRoutes.get(url.pathname)(req, res);
     return;
   }
 
@@ -138,9 +186,16 @@ const server = http.createServer((req, res) => {
   }
 
   const finalRelative = path.relative(root, file);
-  if (finalRelative.startsWith("..") || path.isAbsolute(finalRelative) || !isPublicPath(finalRelative)) {
+  if (finalRelative.startsWith("..") || path.isAbsolute(finalRelative)) {
     send(res, 404, "Not found");
     return;
+  }
+  if (!isPublicPath(finalRelative)) {
+    if (!shouldFallbackToAppShell(pathname)) {
+      send(res, 404, "Not found");
+      return;
+    }
+    file = path.join(root, "index.html");
   }
 
   fs.readFile(file, (error, data) => {
