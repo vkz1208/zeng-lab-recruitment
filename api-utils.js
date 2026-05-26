@@ -8,7 +8,7 @@ function sendJson(res, status, body, headers = {}) {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req, maxBytes = 8 * 1024 * 1024) {
+function readBody(req, maxBytes = 32 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {

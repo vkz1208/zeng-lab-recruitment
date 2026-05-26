@@ -1,14 +1,14 @@
 const { validateContentData } = require("../../content-schema");
 const { writeTenantContentData } = require("../../content-store");
 const { errorStatus, methodNotAllowed, readJson, sendJson } = require("../../api-utils");
-const { generateAcademicSiteDraft } = require("../../academic-site-generator");
+const { generateAcademicSiteDraft, generateProfessorUnderstandingPipeline } = require("../../academic-site-generator");
 const { generateAcademicSiteDraftWithAi, reviseAcademicSiteDraftWithAi } = require("../../ai-provider");
 const {
   blockMap,
   createTask,
   estimateSeconds,
   getOnboardingSession,
-  sanitizeFiles,
+  enrichFilesWithWebPages,
   saveDraftVersion,
   updateOnboardingSession,
   updateTask
@@ -21,15 +21,17 @@ module.exports = async function handler(req, res) {
     const input = await readJson(req);
     const context = await requireTenantAdmin(req);
     if (input.action === "draft") {
-      const files = sanitizeFiles(Array.isArray(input.files) ? input.files : []);
-      const fallbackDraft = generateAcademicSiteDraft({ tenant: context.tenant, files });
-      const result = await generateAcademicSiteDraftWithAi({ tenant: context.tenant, files, fallbackDraft });
+      const files = await enrichFilesWithWebPages(Array.isArray(input.files) ? input.files : []);
+      const pipeline = generateProfessorUnderstandingPipeline({ tenant: context.tenant, files });
+      const fallbackDraft = generateAcademicSiteDraft({ tenant: context.tenant, files, pipeline });
+      const result = await generateAcademicSiteDraftWithAi({ tenant: context.tenant, files, fallbackDraft, pipeline });
       const session = await updateOnboardingSession(context.tenant.id, (draftSession) => {
         draftSession.files = files;
-        saveDraftVersion(draftSession, result.draft, "initial_draft");
+        draftSession.pipeline = result.pipeline || pipeline;
+        saveDraftVersion(draftSession, result.draft, "initial_draft", draftSession.pipeline);
         return draftSession;
       });
-      sendJson(res, 200, { ok: true, draft: result.draft, session, blocks: blockMap, mode: result.mode, warning: result.warning, tenant: context.tenant });
+      sendJson(res, 200, { ok: true, draft: result.draft, pipeline: session.pipeline, session, blocks: blockMap, mode: result.mode, warning: result.warning, tenant: context.tenant });
       return;
     }
     if (input.action === "regenerate") {
@@ -40,14 +42,17 @@ module.exports = async function handler(req, res) {
         files.push({ name: "regeneration-instructions.txt", type: "text/plain", size: extraPrompt.length, text: extraPrompt });
       }
       if (!files.length) throw new Error("missing_onboarding_materials");
-      const fallbackDraft = generateAcademicSiteDraft({ tenant: context.tenant, files });
-      const result = await generateAcademicSiteDraftWithAi({ tenant: context.tenant, files, fallbackDraft });
+      const enrichedFiles = await enrichFilesWithWebPages(files);
+      const pipeline = generateProfessorUnderstandingPipeline({ tenant: context.tenant, files: enrichedFiles });
+      const fallbackDraft = generateAcademicSiteDraft({ tenant: context.tenant, files: enrichedFiles, pipeline });
+      const result = await generateAcademicSiteDraftWithAi({ tenant: context.tenant, files: enrichedFiles, fallbackDraft, pipeline });
       const nextSession = await updateOnboardingSession(context.tenant.id, (draftSession) => {
         draftSession.files = session.files || [];
-        saveDraftVersion(draftSession, result.draft, "regenerate");
+        draftSession.pipeline = result.pipeline || pipeline;
+        saveDraftVersion(draftSession, result.draft, "regenerate", draftSession.pipeline);
         return draftSession;
       });
-      sendJson(res, 200, { ok: true, draft: result.draft, session: nextSession, blocks: blockMap, mode: result.mode, warning: result.warning, tenant: context.tenant });
+      sendJson(res, 200, { ok: true, draft: result.draft, pipeline: nextSession.pipeline, session: nextSession, blocks: blockMap, mode: result.mode, warning: result.warning, tenant: context.tenant });
       return;
     }
     if (input.action === "comment") {
@@ -85,6 +90,7 @@ module.exports = async function handler(req, res) {
         tenant: context.tenant,
         draft: currentDraft,
         files: session.files || [],
+        pipeline: session.pipeline,
         blockId,
         blockLabel: blockMap[blockId].label,
         comment
@@ -96,13 +102,14 @@ module.exports = async function handler(req, res) {
         task.error = validation.errors.join("; ");
       } else {
         task.resultDraft = result.draft;
+        task.pipeline = result.pipeline || session.pipeline || null;
         task.mode = result.mode;
         task.warning = result.warning || "";
         updateTask(task, "complete", "The revised preview is ready to review.");
       }
       const nextSession = await updateOnboardingSession(context.tenant.id, (draftSession) => {
         draftSession.tasks = [task, ...(draftSession.tasks || []).filter((item) => item.id !== task.id)].slice(0, 30);
-        if (task.status === "complete") saveDraftVersion(draftSession, task.resultDraft, `comment:${blockId}`);
+        if (task.status === "complete") saveDraftVersion(draftSession, task.resultDraft, `comment:${blockId}`, task.pipeline);
         return draftSession;
       });
       sendJson(res, 200, { ok: true, task, session: nextSession });
@@ -119,7 +126,7 @@ module.exports = async function handler(req, res) {
       const saved = await writeTenantContentData(context.tenant.id, data);
       await updateOnboardingSession(context.tenant.id, (draftSession) => {
         draftSession.currentDraft = data;
-        saveDraftVersion(draftSession, data, "confirmed");
+        saveDraftVersion(draftSession, data, "confirmed", draftSession.pipeline);
         return draftSession;
       });
       const tenant = await markTenantInitialized(req);

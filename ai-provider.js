@@ -1,4 +1,4 @@
-const { generateAcademicSiteDraft } = require("./academic-site-generator");
+const { generateAcademicSiteDraft, generateProfessorUnderstandingPipeline } = require("./academic-site-generator");
 const { applyLocalCommentToDraft, summarizeFiles } = require("./onboarding-workflow");
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
@@ -125,41 +125,101 @@ function summarizeAcademicFiles(files = []) {
   }));
 }
 
-async function generateAcademicSiteDraftWithAi({ tenant = {}, files = [], fallbackDraft } = {}) {
+function summarizeAcademicFileMetadata(files = []) {
+  return files.slice(0, 20).map((file) => ({
+    name: String(file.name || "").slice(0, 120),
+    type: String(file.type || "").slice(0, 80),
+    size: Number(file.size || 0),
+    sourceUrl: file.sourceUrl || ""
+  }));
+}
+
+function publicPipelineForPrompt(pipeline = {}) {
+  const { draft_context, ...safePipeline } = pipeline || {};
+  return safePipeline;
+}
+
+function buildContentBrief(files = [], localDraft = {}, pipeline = {}) {
+  return {
+    sourceCount: files.length,
+    linkedWebpages: files.filter((file) => file.sourceUrl).map((file) => file.sourceUrl),
+    pipelineVersion: pipeline.version || "",
+    structuredProfessorSchema: pipeline.professor_schema || {},
+    semanticUnderstanding: pipeline.semantic_understanding || {},
+    positioning: pipeline.positioning || {},
+    copywritingPlan: pipeline.copywriting_plan || {},
+    aiDiscoveriesRequireReview: pipeline.ai_discoveries || [],
+    inferredLabName: localDraft.zh?.meta?.labName || localDraft.en?.meta?.labName || "",
+    inferredPi: localDraft.zh?.team?.pi?.name || localDraft.en?.team?.pi?.name || "",
+    inferredThemes: (localDraft.en?.research?.directions || []).map((item) => ({
+      title: item.title,
+      evidence: item.copy
+    })),
+    candidatePublications: (localDraft.en?.papers?.items || []).slice(0, 10),
+    candidateResources: (localDraft.en?.resources?.items || []).slice(0, 8)
+  };
+}
+
+async function generateAcademicSiteDraftWithAi({ tenant = {}, files = [], fallbackDraft, pipeline = null } = {}) {
+  const understanding = pipeline || generateProfessorUnderstandingPipeline({ tenant, files });
   if (!aiStatus().configured) {
-    return { draft: fallbackDraft || generateAcademicSiteDraft({ tenant, files }), mode: "local", warning: "ai_not_configured" };
+    return {
+      draft: fallbackDraft || generateAcademicSiteDraft({ tenant, files, pipeline: understanding }),
+      pipeline: understanding,
+      mode: "local",
+      warning: "ai_not_configured"
+    };
   }
 
-  const localDraft = fallbackDraft || generateAcademicSiteDraft({ tenant, files });
+  const localDraft = fallbackDraft || generateAcademicSiteDraft({ tenant, files, pipeline: understanding });
   const system = [
-    "You generate bilingual academic lab website content.",
+    "You are an academic website strategist and copywriter.",
+    "Use the staged professor understanding pipeline, structured schema, semantic understanding, positioning, and fallback draft before writing.",
+    "Do not use raw uploaded materials as a direct source for website copy. The pipeline schema is the source of truth for this stage.",
+    "Synthesize facts into a polished website narrative; do not merely copy filenames or raw lines.",
+    "Create useful homepage copy, research direction cards, project/resource cards, PI/team summaries, publication entries, and image paths.",
     "Return JSON only. Do not include markdown or explanatory text.",
     "The JSON must match the existing site content shape with zh and en roots.",
-    "Keep links empty or relative paths such as /research, /team, /papers, /news.",
+    "Use image paths from the local draft when relevant; otherwise keep image empty.",
+    "Keep links empty, real uploaded webpage URLs, or relative paths such as /research, /team, /papers, /news.",
     "Use uploaded facts conservatively; do not invent specific publications, people, dates, grants, or metrics.",
-    "If information is missing, write polished placeholders that the tenant can edit later."
+    "AI discoveries are review suggestions only. Do not publish them as facts unless they are already present in the structured schema.",
+    "If information is missing, write polished placeholders that clearly invite later editing.",
+    "Make zh and en both readable. If Chinese facts are unavailable, zh may keep proper names in English but should still be coherent."
   ].join(" ");
   const prompt = JSON.stringify({
-    task: "Create a first website draft for this tenant from uploaded academic materials.",
+    task: "Create a first website draft by understanding and abstracting uploaded academic materials and linked webpages.",
     tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, emailDomain: tenant.emailDomain },
-    files: summarizeAcademicFiles(files),
+    fileMetadata: summarizeAcademicFileMetadata(files),
+    professorUnderstandingPipeline: publicPipelineForPrompt(understanding),
+    contentBrief: buildContentBrief(files, localDraft, understanding),
     localDraft,
-    requiredTopLevelKeys: ["zh", "en"]
+    requiredTopLevelKeys: ["zh", "en"],
+    requiredSections: [
+      "home hero with title/copy/stats/highlights",
+      "research direction cards with title/copy/image",
+      "PI profile and team sections",
+      "publication list",
+      "projects/resources cards",
+      "news placeholder",
+      "join/contact/footer"
+    ]
   });
 
   try {
     const text = await generateText({ system, prompt, maxOutputTokens: 12000 });
     const draft = parseJsonFromText(text);
-    return { draft, mode: "ai", provider: aiStatus().provider };
+    return { draft, pipeline: understanding, mode: "ai", provider: aiStatus().provider };
   } catch (error) {
-    return { draft: localDraft, mode: "local", warning: error.message || "ai_failed" };
+    return { draft: localDraft, pipeline: understanding, mode: "local", warning: error.message || "ai_failed" };
   }
 }
 
-async function reviseAcademicSiteDraftWithAi({ tenant = {}, draft = {}, files = [], blockId = "", blockLabel = "", comment = "" } = {}) {
+async function reviseAcademicSiteDraftWithAi({ tenant = {}, draft = {}, files = [], pipeline = null, blockId = "", blockLabel = "", comment = "" } = {}) {
   const localDraft = applyLocalCommentToDraft(draft, { blockId, comment });
+  const understanding = pipeline || generateProfessorUnderstandingPipeline({ tenant, files });
   if (!aiStatus().configured) {
-    return { draft: localDraft, mode: "local", warning: "ai_not_configured" };
+    return { draft: localDraft, pipeline: understanding, mode: "local", warning: "ai_not_configured" };
   }
 
   const system = [
@@ -167,7 +227,8 @@ async function reviseAcademicSiteDraftWithAi({ tenant = {}, draft = {}, files = 
     "Return JSON only. Do not include markdown or explanatory text.",
     "Preserve the existing content shape with zh and en roots.",
     "Use the user's section-specific comment to improve the draft.",
-    "Do not invent specific people, publications, dates, grants, or metrics unless they appear in the provided materials or existing draft.",
+    "Use the professor understanding pipeline and current draft as the source of truth. Do not directly parse raw source materials for page copy.",
+    "Do not invent specific people, publications, dates, grants, or metrics unless they appear in the structured schema or existing draft.",
     "Keep links empty or relative paths such as /research, /team, /papers, /news."
   ].join(" ");
   const prompt = JSON.stringify({
@@ -175,16 +236,17 @@ async function reviseAcademicSiteDraftWithAi({ tenant = {}, draft = {}, files = 
     tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, emailDomain: tenant.emailDomain },
     targetBlock: { id: blockId, label: blockLabel },
     comment,
-    files: summarizeFiles(files),
+    fileMetadata: summarizeAcademicFileMetadata(files),
+    professorUnderstandingPipeline: publicPipelineForPrompt(understanding),
     currentDraft: draft,
     fallbackDraft: localDraft
   });
 
   try {
     const text = await generateText({ system, prompt, maxOutputTokens: 12000 });
-    return { draft: parseJsonFromText(text), mode: "ai", provider: aiStatus().provider };
+    return { draft: parseJsonFromText(text), pipeline: understanding, mode: "ai", provider: aiStatus().provider };
   } catch (error) {
-    return { draft: localDraft, mode: "local", warning: error.message || "ai_failed" };
+    return { draft: localDraft, pipeline: understanding, mode: "local", warning: error.message || "ai_failed" };
   }
 }
 

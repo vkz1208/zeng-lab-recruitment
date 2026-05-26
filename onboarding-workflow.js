@@ -1,4 +1,5 @@
 const path = require("path");
+const zlib = require("zlib");
 const { readJsonStore, writeJsonStore } = require("./content-store");
 
 const storeBlobPath = process.env.ONBOARDING_BLOB_PATH || "tenant-onboarding.json";
@@ -27,12 +28,97 @@ function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function decodeXmlEntities(value = "") {
+  return String(value)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)));
+}
+
+function parseZipEntries(buffer) {
+  const entries = new Map();
+  let offset = 0;
+  while (offset + 30 < buffer.length) {
+    const signature = buffer.readUInt32LE(offset);
+    if (signature !== 0x04034b50) {
+      offset += 1;
+      continue;
+    }
+    const method = buffer.readUInt16LE(offset + 8);
+    const compressedSize = buffer.readUInt32LE(offset + 18);
+    const uncompressedSize = buffer.readUInt32LE(offset + 22);
+    const nameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataEnd > buffer.length || !compressedSize || !uncompressedSize) break;
+    const name = buffer.slice(nameStart, nameStart + nameLength).toString("utf8");
+    const compressed = buffer.slice(dataStart, dataEnd);
+    let data = Buffer.alloc(0);
+    if (method === 0) data = compressed;
+    if (method === 8) data = zlib.inflateRawSync(compressed);
+    entries.set(name, data);
+    offset = dataEnd;
+  }
+  return entries;
+}
+
+function extractDocxTextFromBase64(base64 = "") {
+  if (!base64) return "";
+  try {
+    const entries = parseZipEntries(Buffer.from(base64, "base64"));
+    const xmlParts = [
+      "word/document.xml",
+      "word/footnotes.xml",
+      "word/endnotes.xml",
+      "word/header1.xml",
+      "word/footer1.xml"
+    ];
+    return xmlParts
+      .map((name) => entries.get(name)?.toString("utf8") || "")
+      .filter(Boolean)
+      .map((xml) => decodeXmlEntities(xml
+        .replace(/<\/w:p>/g, "\n")
+        .replace(/<\/w:tr>/g, "\n")
+        .replace(/<w:tab\/>/g, "\t")
+        .replace(/<[^>]+>/g, "")))
+      .join("\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
+function textLooksBinary(value = "") {
+  const text = String(value || "");
+  if (!text) return false;
+  return /docProps\/|word\/document\.xml|PK\u0003\u0004|�{3,}/.test(text) || (text.match(/\uFFFD/g) || []).length > 8;
+}
+
+function extractUploadedText(file = {}) {
+  const name = String(file.name || "");
+  const rawText = String(file.text || "");
+  if (/\.docx$/i.test(name)) {
+    const docxText = extractDocxTextFromBase64(file.dataBase64);
+    if (docxText) return docxText;
+  }
+  if (textLooksBinary(rawText)) return "";
+  return rawText;
+}
+
 function sanitizeFiles(files = []) {
   return files.slice(0, 20).map((file) => ({
     name: String(file.name || "").slice(0, 160),
     type: String(file.type || "").slice(0, 100),
     size: Number(file.size || 0),
-    text: String(file.text || "").slice(0, 120000)
+    text: extractUploadedText(file).slice(0, 120000)
   }));
 }
 
@@ -43,6 +129,100 @@ function summarizeFiles(files = []) {
     size: file.size,
     text: file.text.replace(/\s+/g, " ").trim().slice(0, 1200)
   }));
+}
+
+function extractUrls(files = []) {
+  const found = [];
+  files.forEach((file) => {
+    const text = `${file.name || ""}\n${file.text || ""}`;
+    const matches = text.match(/https?:\/\/[^\s<>"')]+/gi) || [];
+    matches.forEach((url) => {
+      const clean = url.replace(/[.,;]+$/, "");
+      if (!found.includes(clean)) found.push(clean);
+    });
+  });
+  return found.slice(0, 6);
+}
+
+function htmlToReadableText(html = "") {
+  const raw = String(html || "");
+  const cleanHtml = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ");
+  const title = (cleanHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").trim();
+  const description = (
+    cleanHtml.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
+    || cleanHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["'][^>]*>/i)?.[1]
+    || cleanHtml.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["'][^>]*>/i)?.[1]
+    || ""
+  ).trim();
+  const headingMatches = [...cleanHtml.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)]
+    .map((match) => match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 16);
+  const blockMatches = [...cleanHtml.matchAll(/<(p|li|td)[^>]*>([\s\S]*?)<\/\1>/gi)]
+    .map((match) => match[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+    .filter((line) => line.length > 25 && line.length < 800 && !/outdated browser|javascript|cookies|copyright/i.test(line))
+    .slice(0, 120);
+  return [
+    title ? `WEBPAGE TITLE: ${title}` : "",
+    description ? `WEBPAGE DESCRIPTION: ${description}` : "",
+    headingMatches.length ? `WEBPAGE HEADINGS:\n${headingMatches.join("\n")}` : "",
+    blockMatches.length ? `WEBPAGE CONTENT:\n${blockMatches.join("\n")}` : ""
+  ].filter(Boolean).join("\n\n")
+    .replace(/<\/(p|div|section|article|h1|h2|h3|li|tr)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function fetchUrlText(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7000);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 AcademicSiteOnboardingBot/1.0",
+        "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.2"
+      },
+      redirect: "follow",
+      signal: controller.signal
+    });
+    if (!res.ok) return "";
+    const contentType = res.headers.get("content-type") || "";
+    const text = await res.text();
+    const readable = /html/i.test(contentType) ? htmlToReadableText(text) : text;
+    return readable.replace(/\s+/g, " ").trim().slice(0, 16000);
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function enrichFilesWithWebPages(files = []) {
+  const sanitized = sanitizeFiles(files);
+  const urls = extractUrls(sanitized);
+  if (!urls.length) return sanitized;
+  const fetched = await Promise.all(urls.map(async (url) => ({
+    name: `webpage-${url.replace(/^https?:\/\//, "").slice(0, 90)}.txt`,
+    type: "text/html",
+    size: 0,
+    text: await fetchUrlText(url),
+    sourceUrl: url
+  })));
+  return [
+    ...sanitized,
+    ...fetched.filter((file) => file.text && file.text.length > 80)
+  ].slice(0, 26);
 }
 
 async function readOnboardingStore() {
@@ -60,6 +240,7 @@ function emptySession(tenantId) {
   return {
     tenantId,
     currentDraft: null,
+    pipeline: null,
     versions: [],
     files: [],
     comments: [],
@@ -84,14 +265,16 @@ async function updateOnboardingSession(tenantId, updater) {
   return next;
 }
 
-function saveDraftVersion(session, draft, reason = "draft") {
+function saveDraftVersion(session, draft, reason = "draft", pipeline = null) {
   const version = {
     id: `version_${Date.now()}_${session.versions.length + 1}`,
     reason,
     draft: clone(draft),
+    pipeline: clone(pipeline || session.pipeline || null),
     createdAt: nowIso()
   };
   session.currentDraft = clone(draft);
+  if (pipeline) session.pipeline = clone(pipeline);
   session.versions = [...(session.versions || []), version].slice(-12);
   return version;
 }
@@ -214,6 +397,7 @@ module.exports = {
   getBlockPath,
   getOnboardingSession,
   progressForStatus,
+  enrichFilesWithWebPages,
   sanitizeFiles,
   saveDraftVersion,
   summarizeFiles,

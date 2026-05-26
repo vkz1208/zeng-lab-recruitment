@@ -132,15 +132,26 @@ function trackVisit() {
 }
 
 async function apiJson(url, options = {}) {
-  const res = await fetch(url, {
-    cache: "no-store",
-    credentials: "same-origin",
-    ...options,
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) }
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok || payload.ok === false) throw new Error(payload.error || "request_failed");
-  return payload;
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      credentials: "same-origin",
+      ...options,
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+    });
+    const text = await res.text();
+    let payload = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = { error: text.slice(0, 180) };
+    }
+    if (!res.ok || payload.ok === false) throw new Error(payload.error || `http_${res.status}`);
+    return payload;
+  } catch (error) {
+    if (error?.message && error.message !== "Failed to fetch") throw error;
+    throw new Error("request_failed_check_file_size_or_network");
+  }
 }
 
 async function loadAuthContext() {

@@ -1,3 +1,5 @@
+let onboardingSelectedFiles = [];
+
 function renderAuthCard(mode = "login", message = "") {
   adminMode = false;
   const verifyParams = new URLSearchParams(location.search);
@@ -57,20 +59,42 @@ function installAuthHandlers() {
 
 function fileReadPromise(file) {
   return new Promise((resolve) => {
+    const isText = String(file.type || "").startsWith("text/") || /\.(txt|md|csv|tsv|bib|ris|json)$/i.test(file.name);
+    const isDocx = /\.docx$/i.test(file.name);
+    const maxBinaryBytes = 2 * 1024 * 1024;
     const reader = new FileReader();
-    reader.addEventListener("load", () => resolve({
+    const basic = {
       name: file.name,
       type: file.type || "",
-      size: file.size,
-      text: String(reader.result || "").slice(0, 120000)
+      size: file.size
+    };
+    reader.addEventListener("load", () => resolve({
+      ...basic,
+      ...(isText
+        ? { text: String(reader.result || "").slice(0, 120000) }
+        : { dataBase64: String(reader.result || "").split(",")[1] || "", text: "" })
     }));
     reader.addEventListener("error", () => resolve({
-      name: file.name,
-      type: file.type || "",
-      size: file.size,
-      text: ""
+      ...basic,
+      text: `Uploaded file: ${file.name}. The browser could not read this file; please add a short description or upload a text/CSV/BibTeX version if the content is important.`
     }));
-    reader.readAsText(file);
+    if (isText) {
+      reader.readAsText(file);
+    } else if (isDocx && file.size <= maxBinaryBytes) {
+      reader.readAsDataURL(file);
+    } else {
+      const kind = isDocx
+        ? "Word document is larger than the first-version upload limit"
+        : /\.(pdf)$/i.test(file.name)
+          ? "PDF text extraction is not available in this first version"
+          : String(file.type || "").startsWith("image/")
+            ? "Image file uploaded for later visual use"
+            : "Binary file uploaded";
+      resolve({
+        ...basic,
+        text: `${kind}: ${file.name}. Please add the key facts in the notes field or upload a text/CSV/BibTeX/Markdown version so AI can use the content.`
+      });
+    }
   });
 }
 
@@ -84,6 +108,38 @@ function mergeDraftWithDefaults(draft) {
     if (!Array.isArray(next[locale].pages)) next[locale].pages = [];
   });
   return next;
+}
+
+function fileSizeLabel(size = 0) {
+  const bytes = Number(size || 0);
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+function fileStatusLabel(file) {
+  const name = file.name || "";
+  if (/\.(txt|md|csv|tsv|bib|ris|json)$/i.test(name) || String(file.type || "").startsWith("text/")) return "Readable text";
+  if (/\.docx$/i.test(name) && file.size <= 2 * 1024 * 1024) return "Word text will be extracted";
+  if (/\.docx$/i.test(name)) return "Large Word file; add key facts in notes";
+  if (/\.pdf$/i.test(name)) return "PDF kept as context; paste key facts in notes";
+  if (String(file.type || "").startsWith("image/")) return "Image queued as visual reference";
+  return "File queued";
+}
+
+function renderSelectedFileList() {
+  if (!onboardingSelectedFiles.length) {
+    return `<p class="upload-empty">No files selected yet. You can choose several files together.</p>`;
+  }
+  return onboardingSelectedFiles.map((file, index) => `
+    <article class="upload-file-row">
+      <div>
+        <strong>${esc(file.name)}</strong>
+        <span>${esc(fileStatusLabel(file))} · ${esc(fileSizeLabel(file.size))}</span>
+      </div>
+      <button type="button" data-remove-upload="${index}" aria-label="Remove ${esc(file.name)}">Remove</button>
+    </article>
+  `).join("");
 }
 
 function renderTenantOnboarding(message = "") {
@@ -100,10 +156,16 @@ function renderTenantOnboarding(message = "") {
       ${hasDraft ? renderOnboardingWorkbench(message) : `
         <section class="onboarding-grid">
           <form id="onboarding-form" class="onboarding-panel">
-          <label>Academic files
-            <span class="field-help">You can upload your CV, project descriptions, publication lists, student/team lists, lab photos, member photos, BibTeX/RIS exports, Markdown, TXT, CSV, or other materials that help us understand your academic profile.</span>
-            <input id="onboarding-files" name="files" type="file" multiple accept=".txt,.md,.csv,.tsv,.bib,.ris,.json,.pdf,.doc,.docx" />
-          </label>
+          <div class="upload-field">
+            <label for="onboarding-files">Academic files</label>
+            <span class="field-help">Upload multiple files at once: CV, project descriptions, publication lists, student/team lists, lab photos, member photos, BibTeX/RIS exports, Markdown, TXT, CSV, Word documents, or other materials that help us understand your academic profile.</span>
+            <div class="upload-dropzone" id="onboarding-dropzone">
+              <strong>Drop files here or click to browse</strong>
+              <span>Best for AI: DOCX under 2MB, TXT, Markdown, CSV, BibTeX, RIS, JSON. Photos and PDFs are kept as context but first-version text extraction is limited.</span>
+              <input id="onboarding-files" name="files" type="file" multiple accept=".txt,.md,.csv,.tsv,.bib,.ris,.json,.pdf,.doc,.docx,image/*" />
+            </div>
+            <div class="upload-file-list" id="onboarding-file-list">${renderSelectedFileList()}</div>
+          </div>
           <label>Official school or department website
             <input id="onboarding-school-url" type="url" placeholder="https://www.example.edu/department" />
           </label>
@@ -127,13 +189,97 @@ function renderTenantOnboarding(message = "") {
           </form>
           <section class="onboarding-panel onboarding-preview">
             <h2>Your draft preview</h2>
-            <p>After you upload materials, a preview summary will appear here. Nothing will be published until you confirm it.</p>
+            <p>After you upload materials, this will become a live website preview. You can review the real page layout before anything is published.</p>
           </section>
         </section>
       `}
     </main>
   `;
   installOnboardingHandlers();
+}
+
+function previewData(draft) {
+  const zh = draft?.zh || {};
+  return {
+    meta: zh.meta || {},
+    home: zh.home || {},
+    team: zh.team || {},
+    papers: zh.papers || {},
+    research: zh.research || {},
+    resources: zh.resources || {},
+    news: zh.news || {}
+  };
+}
+
+function sectionCommentButton(blockId) {
+  const block = onboardingCommentBlocks().find((item) => item.id === blockId);
+  return `<button class="preview-comment-pin" type="button" data-comment-block="${esc(blockId)}">Comment${block ? `: ${esc(block.label)}` : ""}</button>`;
+}
+
+function renderWebsitePreview(draft) {
+  const d = previewData(draft);
+  const h = d.home;
+  const directions = d.research.directions || h.highlights || [];
+  const papers = d.papers.items || [];
+  const members = (d.team.sections || []).flatMap((section) => section.members || []);
+  const resources = d.resources.items || [];
+  const news = d.news.items || [];
+  return `
+    <div class="wysiwyg-preview">
+      <header class="wysiwyg-header">
+        <strong>${esc(d.meta.labName || h.title || "Academic Lab")}</strong>
+        <nav>
+          <a>Home</a><a>Research</a><a>Team</a><a>Publications</a><a>Contact</a>
+        </nav>
+      </header>
+      <section class="wysiwyg-hero" data-preview-section="home.hero">
+        ${sectionCommentButton("home.hero")}
+        <p class="eyebrow">${esc(h.eyebrow || "Academic website preview")}</p>
+        <h1>${esc(h.title || d.meta.labName || "Academic Lab")}</h1>
+        <p>${esc(h.copy || d.meta.shortIntro || "")}</p>
+        <div class="wysiwyg-actions"><span>Research</span><span>Publications</span></div>
+        <div class="wysiwyg-stats">${(h.stats || []).slice(0, 3).map((item) => `<div><strong>${esc(item.value)}</strong><span>${esc(item.label)}</span></div>`).join("")}</div>
+      </section>
+      <section class="wysiwyg-section" data-preview-section="research.directions">
+        ${sectionCommentButton("research.directions")}
+        <div class="wysiwyg-section-head"><h2>${esc(d.research.title || "Research")}</h2><p>${esc(d.research.intro || "")}</p></div>
+        <div class="wysiwyg-card-grid">
+          ${directions.slice(0, 6).map((item) => `<article><h3>${esc(item.title || "")}</h3><p>${esc(item.copy || "")}</p></article>`).join("") || "<article><h3>Research direction</h3><p>Add research materials to generate this section.</p></article>"}
+        </div>
+      </section>
+      <section class="wysiwyg-section wysiwyg-two-col" data-preview-section="team.pi">
+        ${sectionCommentButton("team.pi")}
+        <div>
+          <h2>${esc(d.team.title || "Team")}</h2>
+          <h3>${esc(d.team.pi?.name || d.meta.labName || "Principal Investigator")}</h3>
+          <p>${esc(d.team.pi?.role || "Principal Investigator")}</p>
+          ${(d.team.pi?.details || []).slice(0, 2).map((item) => `<p>${esc(item)}</p>`).join("")}
+        </div>
+        <div data-preview-section="team.members">
+          ${sectionCommentButton("team.members")}
+          <h3>Members</h3>
+          <ul>${members.slice(0, 8).map((member) => `<li><strong>${esc(member.name)}</strong><span>${esc(member.role || "")}</span></li>`).join("") || "<li><strong>No members identified yet</strong><span>Add a student/team list to fill this section.</span></li>"}</ul>
+        </div>
+      </section>
+      <section class="wysiwyg-section" data-preview-section="papers.items">
+        ${sectionCommentButton("papers.items")}
+        <div class="wysiwyg-section-head"><h2>${esc(d.papers.title || "Publications")}</h2><p>${esc(d.papers.intro || "")}</p></div>
+        <div class="wysiwyg-paper-list">
+          ${papers.slice(0, 8).map((paper) => `<article><span>${esc(paper.year || "")}</span><div><strong>${esc(paper.title || "")}</strong><p>${esc(paper.authors || "")} · ${esc(paper.journal || "")}</p></div></article>`).join("") || "<article><span></span><div><strong>No publications identified yet</strong><p>Upload a publication list, BibTeX, RIS, or paste key publications in notes.</p></div></article>"}
+        </div>
+      </section>
+      <section class="wysiwyg-section" data-preview-section="resources.items">
+        ${sectionCommentButton("resources.items")}
+        <div class="wysiwyg-section-head"><h2>${esc(d.resources.title || "Projects and Materials")}</h2><p>${esc(d.resources.intro || "")}</p></div>
+        <div class="wysiwyg-card-grid">${resources.slice(0, 4).map((item) => `<article><h3>${esc(item.title || "")}</h3><p>${esc(item.copy || "")}</p></article>`).join("") || "<article><h3>Projects</h3><p>Add project materials to generate this section.</p></article>"}</div>
+      </section>
+      <section class="wysiwyg-section" data-preview-section="news.items">
+        ${sectionCommentButton("news.items")}
+        <div class="wysiwyg-section-head"><h2>${esc(d.news.title || "News")}</h2></div>
+        <div class="wysiwyg-news-row">${news.slice(0, 3).map((item) => `<article><span>${esc(item.date || "")}</span><strong>${esc(item.title || "")}</strong><p>${esc(item.copy || "")}</p></article>`).join("")}</div>
+      </section>
+    </div>
+  `;
 }
 
 function renderOnboardingWorkbench(message = "") {
@@ -148,18 +294,7 @@ function renderOnboardingWorkbench(message = "") {
           <button id="confirm-onboarding" class="save" type="button">Looks good. Publish this draft</button>
         </div>
         ${message ? `<p class="auth-message">${esc(message)}</p>` : ""}
-        ${onboardingSummary(onboardingDraft)}
-        <div class="comment-block-grid">
-          ${onboardingCommentBlocks().map((block) => `
-            <article class="comment-block-card" data-block-id="${esc(block.id)}">
-              <div>
-                <span>${esc(block.label)}</span>
-                <p>${esc(block.summary)}</p>
-              </div>
-              <button type="button" data-comment-block="${esc(block.id)}">Comment</button>
-            </article>
-          `).join("")}
-        </div>
+        ${renderWebsitePreview(onboardingDraft)}
       </section>
       <aside class="onboarding-task-panel">
         <section class="onboarding-panel">
@@ -174,6 +309,9 @@ function renderOnboardingWorkbench(message = "") {
           <h2>Section comments</h2>
           <p>Select a section on the left and tell AI what to improve. We will show the estimated time, progress, and concise modification steps.</p>
           <div id="comment-form-slot"><p>No section selected yet.</p></div>
+        </section>
+        <section class="onboarding-panel pipeline-panel" id="pipeline-review-panel">
+          ${renderPipelineReview()}
         </section>
         <section class="onboarding-panel" id="task-status-panel">
           ${renderTaskStatus(onboardingLatestTask())}
@@ -236,6 +374,47 @@ function onboardingLatestTask() {
   return onboardingSession?.tasks?.[0] || null;
 }
 
+function currentPipeline() {
+  return onboardingSession?.pipeline || null;
+}
+
+function renderPipelineReview() {
+  const pipeline = currentPipeline();
+  if (!pipeline) {
+    return `
+      <h2>Understanding pipeline</h2>
+      <p>The structured professor understanding record will appear after draft generation.</p>
+    `;
+  }
+  const schema = pipeline.professor_schema || {};
+  const positioning = pipeline.positioning || {};
+  const discoveries = pipeline.ai_discoveries || [];
+  const stages = pipeline.stages || [];
+  return `
+    <h2>Understanding pipeline</h2>
+    <p>AI output is a draft. Publishing still requires CMS confirmation.</p>
+    <div class="pipeline-stage-list">
+      ${stages.map((stage) => `<span>${esc(stage.key)}: ${esc(stage.status)}</span>`).join("")}
+    </div>
+    <dl class="pipeline-facts">
+      <div><dt>Professor</dt><dd>${esc(schema.profile?.name || "Not identified")}</dd></div>
+      <div><dt>Primary domain</dt><dd>${esc((schema.research?.areas || [])[0] || positioning.hero_direction || "Not identified")}</dd></div>
+      <div><dt>Core message</dt><dd>${esc(positioning.core_message || "Pending")}</dd></div>
+      <div><dt>Review-only discoveries</dt><dd>${discoveries.length}</dd></div>
+    </dl>
+    ${discoveries.length ? `
+      <div class="pipeline-discoveries">
+        ${discoveries.slice(0, 3).map((item) => `
+          <article>
+            <strong>${esc(item.title || item.type || "Discovery")}</strong>
+            <p>${esc(item.description || "")}</p>
+          </article>
+        `).join("")}
+      </div>
+    ` : ""}
+  `;
+}
+
 function renderTaskStatus(task) {
   if (!task) {
     return `
@@ -261,10 +440,36 @@ function renderTaskStatus(task) {
 }
 
 function installOnboardingHandlers() {
+  const fileInput = $("#onboarding-files");
+  const fileList = $("#onboarding-file-list");
+  const refreshFileList = () => {
+    if (fileList) fileList.innerHTML = renderSelectedFileList();
+    document.querySelectorAll("[data-remove-upload]").forEach((button) => {
+      button.addEventListener("click", () => {
+        onboardingSelectedFiles.splice(Number(button.dataset.removeUpload), 1);
+        refreshFileList();
+      });
+    });
+  };
+  fileInput?.addEventListener("change", () => {
+    const nextFiles = [...fileInput.files];
+    const existing = new Set(onboardingSelectedFiles.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+    nextFiles.forEach((file) => {
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (!existing.has(key)) onboardingSelectedFiles.push(file);
+    });
+    onboardingSelectedFiles = onboardingSelectedFiles.slice(0, 20);
+    fileInput.value = "";
+    refreshFileList();
+  });
+  $("#onboarding-dropzone")?.addEventListener("click", (event) => {
+    if (event.target !== fileInput) fileInput?.click();
+  });
+  refreshFileList();
+
   $("#onboarding-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const input = $("#onboarding-files");
-    const files = await Promise.all([...input.files].slice(0, 20).map(fileReadPromise));
+    const files = await Promise.all(onboardingSelectedFiles.slice(0, 20).map(fileReadPromise));
     const links = [
       ["Official school or department website", $("#onboarding-school-url")?.value],
       ["Personal or lab homepage", $("#onboarding-homepage-url")?.value],
@@ -286,6 +491,11 @@ function installOnboardingHandlers() {
       renderTenantOnboarding("Please upload at least one file, add a useful link, or write a short note so we have something to start from.");
       return;
     }
+    const requestBytes = new Blob([JSON.stringify({ action: "draft", files })]).size;
+    if (requestBytes > 3.5 * 1024 * 1024) {
+      renderTenantOnboarding("The selected files are too large for this preview step. Please upload fewer Word files, remove large photos/PDFs, or paste the key facts into the notes field.");
+      return;
+    }
     try {
       const payload = await apiJson("/api/tenant/onboarding", {
         method: "POST",
@@ -293,8 +503,11 @@ function installOnboardingHandlers() {
       });
       onboardingDraft = mergeDraftWithDefaults(payload.draft);
       onboardingSession = payload.session || null;
+      if (payload.pipeline && onboardingSession) onboardingSession.pipeline = payload.pipeline;
       onboardingBlocks = payload.blocks || onboardingBlocks || {};
-      const source = payload.mode === "ai" ? "Your AI draft is ready." : "Your first draft is ready.";
+      const source = payload.mode === "ai"
+        ? "Your AI draft is ready."
+        : "A rule-based preview is ready. Configure an AI key for deeper synthesis and copywriting.";
       renderTenantOnboarding(`${source} Please review the summary, then publish it when it feels like a good starting point.`);
     } catch (error) {
       renderTenantOnboarding(`We could not create the draft yet: ${error.message}`);
@@ -310,8 +523,9 @@ function installOnboardingHandlers() {
       });
       onboardingDraft = mergeDraftWithDefaults(payload.draft);
       onboardingSession = payload.session || onboardingSession;
+      if (payload.pipeline && onboardingSession) onboardingSession.pipeline = payload.pipeline;
       onboardingBlocks = payload.blocks || onboardingBlocks || {};
-      renderTenantOnboarding(payload.mode === "ai" ? "A new AI draft is ready." : "A new preview draft is ready.");
+      renderTenantOnboarding(payload.mode === "ai" ? "A new AI draft is ready." : "A new rule-based preview is ready. Configure an AI key for deeper synthesis.");
     } catch (error) {
       renderTenantOnboarding(`We could not regenerate the draft yet: ${error.message}`);
     }
