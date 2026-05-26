@@ -9,6 +9,7 @@ const files = [
   "admin.css",
   "api-client.js",
   "admin-ui.js",
+  "public-pages-ui.js",
   "team-ui.js",
   "script.js",
   "site-data.js",
