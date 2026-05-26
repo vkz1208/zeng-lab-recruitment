@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { pageDirs: pageDirList, publicRootFiles: publicRootFileList } = require("./static-manifest");
 const { validateContentData } = require("./content-schema");
 const { readContentData, writeContentData } = require("./content-store");
 const authRegister = require("./api/auth/register");
@@ -21,21 +22,8 @@ const root = __dirname;
 const port = process.env.PORT || 3000;
 const adminToken = process.env.ADMIN_TOKEN || "";
 const maxBodyBytes = 2 * 1024 * 1024;
-const pageDirs = new Set(["admin", "super-admin", "team", "papers", "research", "resources", "news", "join", "contact"]);
-const publicRootFiles = new Set([
-  "index.html",
-  "styles.css",
-  "admin.css",
-  "api-client.js",
-  "admin-ui.js",
-  "admin-auth-ui.js",
-  "public-pages-ui.js",
-  "team-ui.js",
-  "script.js",
-  "site-data.js",
-  "papers-data.js",
-  "content.json"
-]);
+const pageDirs = new Set(pageDirList);
+const publicRootFiles = new Set(publicRootFileList);
 
 const types = {
   ".html": "text/html; charset=utf-8",
