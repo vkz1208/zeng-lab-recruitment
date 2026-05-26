@@ -89,15 +89,17 @@ function mergeDraftWithDefaults(draft) {
 function renderTenantOnboarding(message = "") {
   adminMode = false;
   onboardingDraft = onboardingDraft || null;
+  const hasDraft = Boolean(onboardingDraft);
   app.innerHTML = `
     <main class="onboarding-page">
       <section class="onboarding-hero">
         <p class="eyebrow">First-time setup</p>
-        <h1>Let us draft your academic website from the materials you already have</h1>
-        <p>Share the files and links that best describe your lab. We will use them to prepare a first version of your homepage, research directions, team page, publication list, and project highlights. You can review everything before it is published.</p>
+        <h1>${hasDraft ? "Review and refine your website preview" : "Let us draft your academic website from the materials you already have"}</h1>
+        <p>${hasDraft ? "Comment on a specific section, regenerate the whole draft with new guidance, or publish when it feels ready. These changes only affect the preview until you confirm." : "Share the files and links that best describe your lab. We will use them to prepare a first version of your homepage, research directions, team page, publication list, and project highlights. You can review everything before it is published."}</p>
       </section>
-      <section class="onboarding-grid">
-        <form id="onboarding-form" class="onboarding-panel">
+      ${hasDraft ? renderOnboardingWorkbench(message) : `
+        <section class="onboarding-grid">
+          <form id="onboarding-form" class="onboarding-panel">
           <label>Academic files
             <span class="field-help">You can upload your CV, project descriptions, publication lists, student/team lists, lab photos, member photos, BibTeX/RIS exports, Markdown, TXT, CSV, or other materials that help us understand your academic profile.</span>
             <input id="onboarding-files" name="files" type="file" multiple accept=".txt,.md,.csv,.tsv,.bib,.ris,.json,.pdf,.doc,.docx" />
@@ -122,16 +124,63 @@ function renderTenantOnboarding(message = "") {
           </label>
           <button class="save" type="submit">Create my first website draft</button>
           ${message ? `<p class="auth-message">${esc(message)}</p>` : ""}
-        </form>
-        <section class="onboarding-panel onboarding-preview">
-          <h2>Your draft preview</h2>
-          ${onboardingDraft ? onboardingSummary(onboardingDraft) : `<p>After you upload materials, a preview summary will appear here. Nothing will be published until you confirm it.</p>`}
-          ${onboardingDraft ? `<button id="confirm-onboarding" class="save" type="button">Looks good. Publish this draft</button>` : ""}
+          </form>
+          <section class="onboarding-panel onboarding-preview">
+            <h2>Your draft preview</h2>
+            <p>After you upload materials, a preview summary will appear here. Nothing will be published until you confirm it.</p>
+          </section>
         </section>
-      </section>
+      `}
     </main>
   `;
   installOnboardingHandlers();
+}
+
+function renderOnboardingWorkbench(message = "") {
+  return `
+    <section class="onboarding-workbench">
+      <section class="onboarding-preview-page">
+        <div class="preview-page-head">
+          <div>
+            <p class="eyebrow">Preview workspace</p>
+            <h2>${esc(onboardingDraft?.zh?.home?.title || onboardingDraft?.zh?.meta?.labName || "Academic website draft")}</h2>
+          </div>
+          <button id="confirm-onboarding" class="save" type="button">Looks good. Publish this draft</button>
+        </div>
+        ${message ? `<p class="auth-message">${esc(message)}</p>` : ""}
+        ${onboardingSummary(onboardingDraft)}
+        <div class="comment-block-grid">
+          ${onboardingCommentBlocks().map((block) => `
+            <article class="comment-block-card" data-block-id="${esc(block.id)}">
+              <div>
+                <span>${esc(block.label)}</span>
+                <p>${esc(block.summary)}</p>
+              </div>
+              <button type="button" data-comment-block="${esc(block.id)}">Comment</button>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+      <aside class="onboarding-task-panel">
+        <section class="onboarding-panel">
+          <h2>Regenerate draft</h2>
+          <p>Use this when the whole direction feels off, or when you want a different tone, structure, or emphasis.</p>
+          <label>Guidance for regeneration
+            <textarea id="regenerate-instructions" rows="4" placeholder="Example: make the homepage more PI-centered, emphasize remote sensing and climate AI, use a more formal academic tone..."></textarea>
+          </label>
+          <button id="regenerate-draft" type="button">Regenerate preview</button>
+        </section>
+        <section class="onboarding-panel" id="comment-panel">
+          <h2>Section comments</h2>
+          <p>Select a section on the left and tell AI what to improve. We will show the estimated time, progress, and concise modification steps.</p>
+          <div id="comment-form-slot"><p>No section selected yet.</p></div>
+        </section>
+        <section class="onboarding-panel" id="task-status-panel">
+          ${renderTaskStatus(onboardingLatestTask())}
+        </section>
+      </aside>
+    </section>
+  `;
 }
 
 function onboardingSummary(draft) {
@@ -152,6 +201,62 @@ function onboardingSummary(draft) {
         ${directions.slice(0, 4).map((item) => `<li>${esc(item.title || item.copy || "")}</li>`).join("")}
       </ol>
     </div>
+  `;
+}
+
+function onboardingCommentBlocks() {
+  const zh = onboardingDraft?.zh || {};
+  const blocks = onboardingBlocks && Object.keys(onboardingBlocks).length ? onboardingBlocks : {
+    "home.hero": { label: "Homepage hero" },
+    "team.pi": { label: "PI profile" },
+    "team.members": { label: "Team members" },
+    "papers.items": { label: "Publications" },
+    "research.directions": { label: "Research directions" },
+    "resources.items": { label: "Projects and resources" },
+    "news.items": { label: "News" }
+  };
+  const summaries = {
+    "home.hero": zh.home?.copy || zh.meta?.shortIntro || "",
+    "home.highlights": (zh.home?.highlights || []).map((item) => item.title).join(", "),
+    "team.pi": [zh.team?.pi?.name, zh.team?.pi?.role].filter(Boolean).join(" - "),
+    "team.members": `${(zh.team?.sections || []).flatMap((section) => section.members || []).length} members identified`,
+    "papers.items": `${(zh.papers?.items || []).length} publication items`,
+    "research.directions": (zh.research?.directions || []).map((item) => item.title).join(", "),
+    "resources.items": `${(zh.resources?.items || []).length} project/resource items`,
+    "news.items": `${(zh.news?.items || []).length} news items`
+  };
+  return Object.entries(blocks).map(([id, block]) => ({
+    id,
+    label: block.label || id,
+    summary: summaries[id] || "Comment on this section."
+  }));
+}
+
+function onboardingLatestTask() {
+  return onboardingSession?.tasks?.[0] || null;
+}
+
+function renderTaskStatus(task) {
+  if (!task) {
+    return `
+      <h2>AI modification progress</h2>
+      <p>No active task yet. Submit a section comment to start a revision.</p>
+    `;
+  }
+  const remaining = Math.max(0, Number(task.estimatedSeconds || 0) - Math.round((Number(task.progressPercent || 0) / 100) * Number(task.estimatedSeconds || 0)));
+  return `
+    <h2>AI modification progress</h2>
+    <div class="task-progress-head">
+      <strong>${esc(task.blockLabel || "Website draft")}</strong>
+      <span>${esc(task.status || "queued")}</span>
+    </div>
+    <div class="task-progress-bar"><span style="width:${Math.max(0, Math.min(100, Number(task.progressPercent || 0)))}%"></span></div>
+    <p>Estimated time: ${Number(task.estimatedSeconds || 0)}s · Remaining: about ${remaining}s</p>
+    <ol class="task-step-list">
+      ${(task.steps || []).map((step) => `<li class="${esc(step.status)}"><strong>${esc(step.label)}</strong>${step.detail ? `<span>${esc(step.detail)}</span>` : ""}</li>`).join("")}
+    </ol>
+    ${task.error ? `<p class="auth-message">Revision failed: ${esc(task.error)}</p>` : ""}
+    ${task.status === "complete" && task.resultDraft ? `<button id="apply-task-draft" class="save" type="button" data-task-id="${esc(task.id)}">Apply revised preview</button>` : ""}
   `;
 }
 
@@ -187,11 +292,47 @@ function installOnboardingHandlers() {
         body: JSON.stringify({ action: "draft", files })
       });
       onboardingDraft = mergeDraftWithDefaults(payload.draft);
+      onboardingSession = payload.session || null;
+      onboardingBlocks = payload.blocks || onboardingBlocks || {};
       const source = payload.mode === "ai" ? "Your AI draft is ready." : "Your first draft is ready.";
       renderTenantOnboarding(`${source} Please review the summary, then publish it when it feels like a good starting point.`);
     } catch (error) {
       renderTenantOnboarding(`We could not create the draft yet: ${error.message}`);
     }
+  });
+
+  $("#regenerate-draft")?.addEventListener("click", async () => {
+    const instructions = $("#regenerate-instructions")?.value || "";
+    try {
+      const payload = await apiJson("/api/tenant/onboarding", {
+        method: "POST",
+        body: JSON.stringify({ action: "regenerate", instructions })
+      });
+      onboardingDraft = mergeDraftWithDefaults(payload.draft);
+      onboardingSession = payload.session || onboardingSession;
+      onboardingBlocks = payload.blocks || onboardingBlocks || {};
+      renderTenantOnboarding(payload.mode === "ai" ? "A new AI draft is ready." : "A new preview draft is ready.");
+    } catch (error) {
+      renderTenantOnboarding(`We could not regenerate the draft yet: ${error.message}`);
+    }
+  });
+
+  document.querySelectorAll("[data-comment-block]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const block = onboardingCommentBlocks().find((item) => item.id === button.dataset.commentBlock);
+      const slot = $("#comment-form-slot");
+      if (!slot || !block) return;
+      slot.innerHTML = `
+        <form id="section-comment-form" data-block-id="${esc(block.id)}">
+          <p><strong>${esc(block.label)}</strong></p>
+          <label>Your improvement request
+            <textarea name="comment" rows="5" required placeholder="Example: make this section more specific, emphasize PI research direction, add clearer student information..."></textarea>
+          </label>
+          <button class="save" type="submit">Ask AI to revise this section</button>
+        </form>
+      `;
+      installSectionCommentHandler();
+    });
   });
 
   $("#confirm-onboarding")?.addEventListener("click", async () => {
@@ -212,6 +353,68 @@ function installOnboardingHandlers() {
       renderTenantOnboarding(`We could not publish the draft yet: ${error.message}`);
     }
   });
+
+  installApplyTaskHandler();
+}
+
+function installApplyTaskHandler() {
+  $("#apply-task-draft")?.addEventListener("click", () => {
+    const task = onboardingLatestTask();
+    if (!task?.resultDraft) return;
+    onboardingDraft = mergeDraftWithDefaults(task.resultDraft);
+    renderTenantOnboarding("The revised preview has been applied. You can keep commenting, regenerate again, or publish this version.");
+  });
+}
+
+function installSectionCommentHandler() {
+  $("#section-comment-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const comment = new FormData(form).get("comment");
+    try {
+      const payload = await apiJson("/api/tenant/onboarding", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "comment",
+          blockId: form.dataset.blockId,
+          comment,
+          draft: onboardingDraft
+        })
+      });
+      onboardingSession = payload.session || onboardingSession;
+      const task = payload.task;
+      onboardingActiveTaskId = task?.id || "";
+      $("#task-status-panel").innerHTML = renderTaskStatus(task);
+      if (onboardingActiveTaskId) pollOnboardingTask(onboardingActiveTaskId);
+    } catch (error) {
+      $("#task-status-panel").innerHTML = renderTaskStatus({
+        status: "failed",
+        blockLabel: "Revision request",
+        estimatedSeconds: 0,
+        progressPercent: 100,
+        steps: [],
+        error: error.message
+      });
+    }
+  });
+}
+
+async function pollOnboardingTask(taskId, attempts = 0) {
+  if (!taskId || attempts > 20) return;
+  try {
+    const payload = await apiJson(`/api/tenant/onboarding-task?id=${encodeURIComponent(taskId)}`, { method: "GET", headers: {} });
+    onboardingSession = payload.session || onboardingSession;
+    const panel = $("#task-status-panel");
+    if (panel) {
+      panel.innerHTML = renderTaskStatus(payload.task);
+      installApplyTaskHandler();
+    }
+    if (!["complete", "failed"].includes(payload.task?.status)) {
+      setTimeout(() => pollOnboardingTask(taskId, attempts + 1), 1200);
+    }
+  } catch {
+    if (attempts < 3) setTimeout(() => pollOnboardingTask(taskId, attempts + 1), 1500);
+  }
 }
 
 async function enterAdminEditor() {

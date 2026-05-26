@@ -71,6 +71,7 @@
           "content-store.js",
           "platform-config.js",
           "review-store.js",
+          "onboarding-workflow.js",
           "tenant-auth.js",
           "content.json"
         ]
@@ -129,6 +130,10 @@
     {
       "src": "/api/tenant/onboarding",
       "dest": "/api/tenant/onboarding.js"
+    },
+    {
+      "src": "/api/tenant/onboarding-task",
+      "dest": "/api/tenant/onboarding-task.js"
     },
     {
       "src": "/api/tenant/settings",

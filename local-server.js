@@ -12,6 +12,7 @@ const authMe = require("./api/auth/me");
 const authChangePassword = require("./api/auth/change-password");
 const tenantContent = require("./api/tenant/content");
 const tenantOnboarding = require("./api/tenant/onboarding");
+const tenantOnboardingTask = require("./api/tenant/onboarding-task");
 const tenantSettings = require("./api/tenant/settings");
 const tenantAnalytics = require("./api/tenant/analytics");
 const tenantReviewQueue = require("./api/tenant/review-queue");
@@ -80,6 +81,7 @@ const apiRoutes = new Map([
   ["/api/auth/change-password", authChangePassword],
   ["/api/tenant/content", tenantContent],
   ["/api/tenant/onboarding", tenantOnboarding],
+  ["/api/tenant/onboarding-task", tenantOnboardingTask],
   ["/api/tenant/settings", tenantSettings],
   ["/api/tenant/analytics", tenantAnalytics],
   ["/api/tenant/review-queue", tenantReviewQueue],

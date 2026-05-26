@@ -21,6 +21,7 @@ const serverRuntimeFiles = [
   "content-store.js",
   "analytics-store.js",
   "review-store.js",
+  "onboarding-workflow.js",
   "academic-site-generator.js",
   "ai-provider.js",
   "platform-config.js",

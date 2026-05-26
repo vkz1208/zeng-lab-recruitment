@@ -1,4 +1,5 @@
 const { generateAcademicSiteDraft } = require("./academic-site-generator");
+const { applyLocalCommentToDraft, summarizeFiles } = require("./onboarding-workflow");
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 
@@ -115,7 +116,7 @@ function parseJsonFromText(text) {
   return JSON.parse((fenced ? fenced[1] : raw).trim());
 }
 
-function summarizeFiles(files = []) {
+function summarizeAcademicFiles(files = []) {
   return files.slice(0, 20).map((file) => ({
     name: String(file.name || "").slice(0, 120),
     type: String(file.type || "").slice(0, 80),
@@ -141,7 +142,7 @@ async function generateAcademicSiteDraftWithAi({ tenant = {}, files = [], fallba
   const prompt = JSON.stringify({
     task: "Create a first website draft for this tenant from uploaded academic materials.",
     tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, emailDomain: tenant.emailDomain },
-    files: summarizeFiles(files),
+    files: summarizeAcademicFiles(files),
     localDraft,
     requiredTopLevelKeys: ["zh", "en"]
   });
@@ -150,6 +151,38 @@ async function generateAcademicSiteDraftWithAi({ tenant = {}, files = [], fallba
     const text = await generateText({ system, prompt, maxOutputTokens: 12000 });
     const draft = parseJsonFromText(text);
     return { draft, mode: "ai", provider: aiStatus().provider };
+  } catch (error) {
+    return { draft: localDraft, mode: "local", warning: error.message || "ai_failed" };
+  }
+}
+
+async function reviseAcademicSiteDraftWithAi({ tenant = {}, draft = {}, files = [], blockId = "", blockLabel = "", comment = "" } = {}) {
+  const localDraft = applyLocalCommentToDraft(draft, { blockId, comment });
+  if (!aiStatus().configured) {
+    return { draft: localDraft, mode: "local", warning: "ai_not_configured" };
+  }
+
+  const system = [
+    "You revise bilingual academic lab website JSON content.",
+    "Return JSON only. Do not include markdown or explanatory text.",
+    "Preserve the existing content shape with zh and en roots.",
+    "Use the user's section-specific comment to improve the draft.",
+    "Do not invent specific people, publications, dates, grants, or metrics unless they appear in the provided materials or existing draft.",
+    "Keep links empty or relative paths such as /research, /team, /papers, /news."
+  ].join(" ");
+  const prompt = JSON.stringify({
+    task: "Revise the current website preview draft according to a tenant comment.",
+    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, emailDomain: tenant.emailDomain },
+    targetBlock: { id: blockId, label: blockLabel },
+    comment,
+    files: summarizeFiles(files),
+    currentDraft: draft,
+    fallbackDraft: localDraft
+  });
+
+  try {
+    const text = await generateText({ system, prompt, maxOutputTokens: 12000 });
+    return { draft: parseJsonFromText(text), mode: "ai", provider: aiStatus().provider };
   } catch (error) {
     return { draft: localDraft, mode: "local", warning: error.message || "ai_failed" };
   }
@@ -184,5 +217,6 @@ module.exports = {
   generateAcademicSiteDraftWithAi,
   generateImage,
   generateText,
+  reviseAcademicSiteDraftWithAi,
   providerConfig
 };
