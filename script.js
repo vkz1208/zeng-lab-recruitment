@@ -4,10 +4,7 @@ const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const BLOCKED_MERGE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const app = document.querySelector("#app");
 
-let siteData = {
-  zh: structuredClone(window.DEFAULT_SITE_DATA.zh),
-  en: structuredClone(window.DEFAULT_SITE_DATA.en)
-};
+let siteData = { zh: {}, en: {} };
 let lang = localStorage.getItem("zeng-lab-lang") || "zh";
 let paperTab = "featured";
 let paperYear = "all";
@@ -365,6 +362,11 @@ function render() {
 }
 
 async function init() {
+  if (typeof window.loadDefaultSiteData === "function") await window.loadDefaultSiteData();
+  siteData = {
+    zh: structuredClone(window.DEFAULT_SITE_DATA.zh || {}),
+    en: structuredClone(window.DEFAULT_SITE_DATA.en || {})
+  };
   await loadPlatformConfig();
   if (typeof window.loadPaperList === "function") await window.loadPaperList();
   if (Array.isArray(window.PAPER_LIST) && window.PAPER_LIST.length) {
