@@ -10,6 +10,7 @@
     "test": "npm run check && node .tools/unit-tests.js && node .tools/smoke-tests.js && node .tools/spec-regression-tests.js",
     "test:admin-crud": "npm run check && node .tools/admin-crud-e2e.js",
     "test:full-flow": "npm run check && node .tools/full-flow-e2e.js",
+    "test:tenant-browser-flow": "npm run check && node .tools/tenant-browser-flow-e2e.js",
     "test:prod-admin-flow": "node .tools/production-admin-flow-test.js"
   },
   "dependencies": {
