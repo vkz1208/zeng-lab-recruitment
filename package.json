@@ -14,7 +14,8 @@
     "test:prod-admin-flow": "node .tools/production-admin-flow-test.js"
   },
   "dependencies": {
-    "@vercel/blob": "^2.4.0"
+    "@vercel/blob": "^2.4.0",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "playwright-core": "^1.60.0"

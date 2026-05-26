@@ -61,7 +61,9 @@ function fileReadPromise(file) {
   return new Promise((resolve) => {
     const isText = String(file.type || "").startsWith("text/") || /\.(txt|md|csv|tsv|bib|ris|json)$/i.test(file.name);
     const isDocx = /\.docx$/i.test(file.name);
-    const maxBinaryBytes = 2 * 1024 * 1024;
+    const isPdf = /\.pdf$/i.test(file.name) || String(file.type || "") === "application/pdf";
+    const maxDocxBytes = 2 * 1024 * 1024;
+    const maxPdfBytes = 6 * 1024 * 1024;
     const reader = new FileReader();
     const basic = {
       name: file.name,
@@ -80,13 +82,13 @@ function fileReadPromise(file) {
     }));
     if (isText) {
       reader.readAsText(file);
-    } else if (isDocx && file.size <= maxBinaryBytes) {
+    } else if ((isDocx && file.size <= maxDocxBytes) || (isPdf && file.size <= maxPdfBytes)) {
       reader.readAsDataURL(file);
     } else {
       const kind = isDocx
         ? "Word document is larger than the first-version upload limit"
-        : /\.(pdf)$/i.test(file.name)
-          ? "PDF text extraction is not available in this first version"
+        : isPdf
+          ? "PDF document is larger than the first-version upload limit"
           : String(file.type || "").startsWith("image/")
             ? "Image file uploaded for later visual use"
             : "Binary file uploaded";
@@ -122,7 +124,8 @@ function fileStatusLabel(file) {
   if (/\.(txt|md|csv|tsv|bib|ris|json)$/i.test(name) || String(file.type || "").startsWith("text/")) return "Readable text";
   if (/\.docx$/i.test(name) && file.size <= 2 * 1024 * 1024) return "Word text will be extracted";
   if (/\.docx$/i.test(name)) return "Large Word file; add key facts in notes";
-  if (/\.pdf$/i.test(name)) return "PDF kept as context; paste key facts in notes";
+  if (/\.pdf$/i.test(name) && file.size <= 6 * 1024 * 1024) return "PDF text will be extracted";
+  if (/\.pdf$/i.test(name)) return "Large PDF; add key facts in notes";
   if (String(file.type || "").startsWith("image/")) return "Image queued as visual reference";
   return "File queued";
 }
@@ -161,7 +164,7 @@ function renderTenantOnboarding(message = "") {
             <span class="field-help">Upload multiple files at once: CV, project descriptions, publication lists, student/team lists, lab photos, member photos, BibTeX/RIS exports, Markdown, TXT, CSV, Word documents, or other materials that help us understand your academic profile.</span>
             <div class="upload-dropzone" id="onboarding-dropzone">
               <strong>Drop files here or click to browse</strong>
-              <span>Best for AI: DOCX under 2MB, TXT, Markdown, CSV, BibTeX, RIS, JSON. Photos and PDFs are kept as context but first-version text extraction is limited.</span>
+              <span>Best for AI: PDF under 6MB, DOCX under 2MB, TXT, Markdown, CSV, BibTeX, RIS, JSON. Photos are kept as visual references.</span>
               <input id="onboarding-files" name="files" type="file" multiple accept=".txt,.md,.csv,.tsv,.bib,.ris,.json,.pdf,.doc,.docx,image/*" />
             </div>
             <div class="upload-file-list" id="onboarding-file-list">${renderSelectedFileList()}</div>
@@ -492,8 +495,8 @@ function installOnboardingHandlers() {
       return;
     }
     const requestBytes = new Blob([JSON.stringify({ action: "draft", files })]).size;
-    if (requestBytes > 3.5 * 1024 * 1024) {
-      renderTenantOnboarding("The selected files are too large for this preview step. Please upload fewer Word files, remove large photos/PDFs, or paste the key facts into the notes field.");
+    if (requestBytes > 12 * 1024 * 1024) {
+      renderTenantOnboarding("The selected files are too large for this preview step. Please upload fewer files, remove large photos/PDFs, or paste the key facts into the notes field.");
       return;
     }
     try {

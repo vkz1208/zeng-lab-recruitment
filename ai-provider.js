@@ -1,5 +1,5 @@
 const { generateAcademicSiteDraft, generateProfessorUnderstandingPipeline } = require("./academic-site-generator");
-const { applyLocalCommentToDraft, summarizeFiles } = require("./onboarding-workflow");
+const { applyLocalCommentToDraft } = require("./onboarding-workflow");
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 

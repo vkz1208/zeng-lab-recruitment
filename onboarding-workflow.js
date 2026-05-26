@@ -1,5 +1,6 @@
 const path = require("path");
 const zlib = require("zlib");
+const { PDFParse } = require("pdf-parse");
 const { readJsonStore, writeJsonStore } = require("./content-store");
 
 const storeBlobPath = process.env.ONBOARDING_BLOB_PATH || "tenant-onboarding.json";
@@ -96,6 +97,23 @@ function extractDocxTextFromBase64(base64 = "") {
   }
 }
 
+async function extractPdfTextFromBase64(base64 = "") {
+  if (!base64) return "";
+  let parser;
+  try {
+    parser = new PDFParse({ data: Buffer.from(base64, "base64") });
+    const result = await parser.getText({ pageJoiner: "\n" });
+    return String(result.text || "")
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  } catch {
+    return "";
+  } finally {
+    if (parser) await parser.destroy().catch(() => {});
+  }
+}
+
 function textLooksBinary(value = "") {
   const text = String(value || "");
   if (!text) return false;
@@ -113,6 +131,15 @@ function extractUploadedText(file = {}) {
   return rawText;
 }
 
+async function extractUploadedTextAsync(file = {}) {
+  const name = String(file.name || "");
+  if (/\.pdf$/i.test(name) || String(file.type || "") === "application/pdf") {
+    const pdfText = await extractPdfTextFromBase64(file.dataBase64);
+    if (pdfText) return pdfText;
+  }
+  return extractUploadedText(file);
+}
+
 function sanitizeFiles(files = []) {
   return files.slice(0, 20).map((file) => ({
     name: String(file.name || "").slice(0, 160),
@@ -120,6 +147,17 @@ function sanitizeFiles(files = []) {
     size: Number(file.size || 0),
     text: extractUploadedText(file).slice(0, 120000)
   }));
+}
+
+async function sanitizeFilesAsync(files = []) {
+  const sliced = files.slice(0, 20);
+  const sanitized = await Promise.all(sliced.map(async (file) => ({
+    name: String(file.name || "").slice(0, 160),
+    type: String(file.type || "").slice(0, 100),
+    size: Number(file.size || 0),
+    text: (await extractUploadedTextAsync(file)).slice(0, 120000)
+  })));
+  return sanitized;
 }
 
 function summarizeFiles(files = []) {
@@ -209,7 +247,7 @@ async function fetchUrlText(url) {
 }
 
 async function enrichFilesWithWebPages(files = []) {
-  const sanitized = sanitizeFiles(files);
+  const sanitized = await sanitizeFilesAsync(files);
   const urls = extractUrls(sanitized);
   if (!urls.length) return sanitized;
   const fetched = await Promise.all(urls.map(async (url) => ({
@@ -399,6 +437,7 @@ module.exports = {
   progressForStatus,
   enrichFilesWithWebPages,
   sanitizeFiles,
+  sanitizeFilesAsync,
   saveDraftVersion,
   summarizeFiles,
   updateOnboardingSession,
